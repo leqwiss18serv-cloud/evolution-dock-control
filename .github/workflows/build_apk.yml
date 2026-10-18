@@ -27,8 +27,19 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # The runner image already ships an Android SDK; we only make sure the packages
+      # required by compileSdk 36 are present and licensed. `|| true` keeps the step
+      # non-fatal - AGP can provision missing packages itself.
+      - name: Prepare Android SDK
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          SDKMANAGER=$(ls "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+          echo "sdkmanager: ${SDKMANAGER:-<none>}"
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+            "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || true
+          fi
+          ls "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/platforms" 2>/dev/null || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
