@@ -31,11 +31,11 @@ class DockPreviewView @JvmOverloads constructor(
     var onDockChanged: ((left: Int, right: Int, top: Int, bottom: Int, height: Int) -> Unit)? = null
 
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF101014.toInt()
+        color = 0xFF101014L.toInt()
     }
     private val dockPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFF2F2F7
+        color = 0xFFF2F2F7.toInt()
     }
     private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0x66FFFFFF
@@ -53,8 +53,8 @@ class DockPreviewView @JvmOverloads constructor(
             0f,
             width.toFloat(),
             height.toFloat(),
-            28.dpToPx(),
-            28.dpToPx(),
+            28f.dpToPx(),
+            28f.dpToPx(),
             backgroundPaint
         )
 
@@ -62,7 +62,7 @@ class DockPreviewView @JvmOverloads constructor(
         dockPaint.color = dockColor
         canvas.drawRoundRect(dockRect, cornerRadiusDp.dpToPx(), cornerRadiusDp.dpToPx(), dockPaint)
 
-        val iconRadius = 13.dpToPx()
+        val iconRadius = 13f.dpToPx()
         val iconCount = 4
         val spacing = dockRect.width() / (iconCount + 1)
         for (index in 1..iconCount) {
@@ -72,10 +72,10 @@ class DockPreviewView @JvmOverloads constructor(
         }
 
         if (isInteractive) {
-            canvas.drawCircle(dockRect.centerX(), dockRect.top, 7.dpToPx(), handlePaint)
-            canvas.drawCircle(dockRect.centerX(), dockRect.bottom, 7.dpToPx(), handlePaint)
-            canvas.drawCircle(dockRect.left, dockRect.centerY(), 7.dpToPx(), handlePaint)
-            canvas.drawCircle(dockRect.right, dockRect.centerY(), 7.dpToPx(), handlePaint)
+            canvas.drawCircle(dockRect.centerX(), dockRect.top, 7f.dpToPx(), handlePaint)
+            canvas.drawCircle(dockRect.centerX(), dockRect.bottom, 7f.dpToPx(), handlePaint)
+            canvas.drawCircle(dockRect.left, dockRect.centerY(), 7f.dpToPx(), handlePaint)
+            canvas.drawCircle(dockRect.right, dockRect.centerY(), 7f.dpToPx(), handlePaint)
         }
     }
 
@@ -167,7 +167,7 @@ class DockPreviewView @JvmOverloads constructor(
     }
 
     private fun touchModeFor(x: Float, y: Float): TouchMode {
-        val edgeSize = 26.dpToPx()
+        val edgeSize = 26f.dpToPx()
         val nearLeft = abs(x - dockRect.left) <= edgeSize
         val nearRight = abs(x - dockRect.right) <= edgeSize
         val nearTop = abs(y - dockRect.top) <= edgeSize
@@ -185,18 +185,18 @@ class DockPreviewView @JvmOverloads constructor(
 
     private fun computeDockRect() {
         val density = resources.displayMetrics.density
-        val horizontalPadding = 18.dpToPx()
-        val verticalPadding = 18.dpToPx()
+        val horizontalPadding = 18f.dpToPx()
+        val verticalPadding = 18f.dpToPx()
         val availableWidth = max(0f, width - horizontalPadding * 2)
         val widthInset = availableWidth * (100f - widthPercent) / 200f
         val left = horizontalPadding + widthInset + leftMarginDp * density
         val right = width - horizontalPadding - widthInset - rightMarginDp * density
-        val dockWidth = max(70.dpToPx(), right - left)
+        val dockWidth = max(70f.dpToPx(), right - left)
 
         val dockHeight = if (heightDp > 0) {
             heightDp * density
         } else {
-            96.dpToPx()
+            96f.dpToPx()
         }
 
         val top = if (dockGravity == GRAVITY_TOP) {

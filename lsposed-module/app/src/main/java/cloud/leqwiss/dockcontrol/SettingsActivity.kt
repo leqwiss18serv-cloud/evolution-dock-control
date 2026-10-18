@@ -178,7 +178,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.liveEditButton).setOnClickListener { button ->
             liveEditing = !liveEditing
             dockPreview.isInteractive = liveEditing
-            button.text = getString(
+            (button as MaterialButton).text = getString(
                 if (liveEditing) R.string.live_edit_disable else R.string.live_edit_enable
             )
         }
