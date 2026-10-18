@@ -237,6 +237,8 @@ class DockControlModule : XposedModule() {
             }
             view.background = background
 
+            applyCenteredPadding(view)
+
             if (style.hideSearch) {
                 hideQsb(view)
             } else {
@@ -282,6 +284,35 @@ class DockControlModule : XposedModule() {
             }
         } catch (throwable: Throwable) {
             log(Log.WARN, TAG, "Applying dock margins failed", throwable)
+        }
+    }
+
+    private fun applyCenteredPadding(view: View) {
+        try {
+            val state = state(view) ?: return
+            val layoutParams = view.layoutParams
+            val desiredHeight = if (layoutParams.height > 0) {
+                layoutParams.height
+            } else {
+                state.height
+            }
+            if (desiredHeight <= 0) return
+
+            val iconAreaHeight = state.height - state.paddingTop - state.paddingBottom
+            if (iconAreaHeight <= 0) return
+
+            val verticalPadding = ((desiredHeight - iconAreaHeight) / 2f).toInt().coerceAtLeast(0)
+            if (view.paddingTop != verticalPadding || view.paddingBottom != verticalPadding) {
+                view.setPadding(
+                    state.paddingLeft,
+                    verticalPadding,
+                    state.paddingRight,
+                    verticalPadding
+                )
+                view.requestLayout()
+            }
+        } catch (throwable: Throwable) {
+            log(Log.WARN, TAG, "Centering dock icons failed", throwable)
         }
     }
 
