@@ -111,12 +111,12 @@ class SettingsActivity : Activity() {
 
     private fun createSlider(
         parent: LinearLayout,
-        max: Int,
+        maximum: Int,
         initialValue: Int,
         onCommit: () -> Unit
     ): SeekBar {
         return SeekBar(this).apply {
-            max = max
+            max = maximum
             progress = initialValue
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {

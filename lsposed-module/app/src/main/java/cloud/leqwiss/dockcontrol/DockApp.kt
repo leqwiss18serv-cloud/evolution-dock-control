@@ -13,7 +13,7 @@ class DockApp : Application() {
                     ServiceHolder.bind(service)
                 }
 
-                override fun onServiceDied() {
+                override fun onServiceDied(service: XposedService) {
                     ServiceHolder.unbind()
                 }
             })
