@@ -1,18 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Dock стиль</string>
-    <string name="module_description">Парящий док в стиле iOS для Pixel Launcher и Launcher3.</string>
+    <string name="module_description">Парящий док в стиле iOS с точной настройкой положения и иконок.</string>
     <string name="settings_title">Настройки дока</string>
     <string name="module_enabled">Включить модуль</string>
     <string name="adaptive_mode">Автоадаптация под текущий док</string>
     <string name="safe_mode">Безопасный режим совместимости</string>
     <string name="force_background">Принудительно заменять фон</string>
     <string name="hide_search">Скрыть строку поиска</string>
-    <string name="style_presets">Готовые стили</string>
+    <string name="style_presets">Готовые темы</string>
     <string name="preset_dark">iOS тёмный</string>
     <string name="preset_light">iOS светлый</string>
     <string name="preset_glass">Матовое стекло</string>
     <string name="preset_black">Глубокий чёрный</string>
+    <string name="preset_blue">Синий</string>
+    <string name="preset_purple">Фиолетовый</string>
+    <string name="preset_sunset">Закат</string>
+    <string name="preset_mint">Мята</string>
+    <string name="dock_position">Положение дока</string>
+    <string name="position_value">Сейчас: %1$s</string>
+    <string name="position_bottom">Снизу</string>
+    <string name="position_top">Сверху</string>
+    <string name="position_left">Слева</string>
+    <string name="position_right">Справа</string>
     <string name="background_color">Цвет фона</string>
     <string name="color_hint">Например: #1C1C1E</string>
     <string name="apply_color">Сохранить цвет</string>
@@ -20,14 +30,23 @@
     <string name="background_opacity_value">Прозрачность фона: %1$d%%</string>
     <string name="corner_radius">Радиус углов</string>
     <string name="corner_radius_value">Радиус углов: %1$d dp</string>
+    <string name="top_margin">Отступ сверху</string>
+    <string name="top_margin_value">Отступ сверху: %1$d dp</string>
     <string name="bottom_margin">Отступ снизу</string>
     <string name="bottom_margin_value">Отступ снизу: %1$d dp</string>
-    <string name="side_margin">Боковой отступ</string>
-    <string name="side_margin_value">Боковой отступ: %1$d dp</string>
+    <string name="left_margin">Отступ слева</string>
+    <string name="left_margin_value">Отступ слева: %1$d dp</string>
+    <string name="right_margin">Отступ справа</string>
+    <string name="right_margin_value">Отступ справа: %1$d dp</string>
     <string name="width_label">Ширина дока</string>
     <string name="width_value">Ширина дока: %1$d%%</string>
     <string name="height_label">Высота дока (0 = авто)</string>
     <string name="height_value">Высота дока: %1$d dp</string>
+    <string name="icon_offset_x">Смещение иконок влево/вправо</string>
+    <string name="icon_offset_x_value">Смещение иконок X: %1$d dp</string>
+    <string name="icon_offset_y">Смещение иконок вверх/вниз</string>
+    <string name="icon_offset_y_value">Смещение иконок Y: %1$d dp</string>
+    <string name="reset_settings">Сбросить настройки</string>
     <string name="service_unavailable">LSPosed не подключён. Установите APK, включите модуль и перезапустите лаунчер.</string>
     <string name="settings_ready">Настройки применяются автоматически после сохранения.</string>
     <string name="settings_saved">Сохранено</string>
