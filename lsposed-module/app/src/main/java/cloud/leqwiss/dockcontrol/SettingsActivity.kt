@@ -1,5 +1,6 @@
 package cloud.leqwiss.dockcontrol
 
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
 import android.widget.EditText

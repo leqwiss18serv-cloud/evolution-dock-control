@@ -238,7 +238,8 @@ class DockControlModule : XposedModule() {
         }
     }
 
-    private fun applyMargins(view: View) {
+    private fun applyMargins(view: View?) {
+        if (view == null) return
         try {
             val layoutParams = view.layoutParams as? ViewGroup.MarginLayoutParams ?: return
             val style = currentStyle
@@ -428,10 +429,10 @@ class DockControlModule : XposedModule() {
             width = view.layoutParams?.width ?: ViewGroup.LayoutParams.MATCH_PARENT,
             height = view.layoutParams?.height ?: ViewGroup.LayoutParams.WRAP_CONTENT,
             gravity = (view.layoutParams as? FrameLayout.LayoutParams)?.gravity ?: Gravity.BOTTOM,
-            leftMargin = view.layoutParams?.leftMargin ?: 0,
-            topMargin = view.layoutParams?.topMargin ?: 0,
-            rightMargin = view.layoutParams?.rightMargin ?: 0,
-            bottomMargin = view.layoutParams?.bottomMargin ?: 0
+            leftMargin = (view.layoutParams as? ViewGroup.MarginLayoutParams)?.leftMargin ?: 0,
+            topMargin = (view.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0,
+            rightMargin = (view.layoutParams as? ViewGroup.MarginLayoutParams)?.rightMargin ?: 0,
+            bottomMargin = (view.layoutParams as? ViewGroup.MarginLayoutParams)?.bottomMargin ?: 0
         )
     }
 
