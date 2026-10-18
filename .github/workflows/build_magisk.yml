@@ -1,0 +1,27 @@
+name: Build Magisk ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "magisk-module/**"
+      - ".github/workflows/build_magisk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package Magisk module
+        run: |
+          cd magisk-module
+          zip -r ../EvolutionDockControl.zip . -x '.git/*'
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: evolution-dock-control-magisk
+          path: EvolutionDockControl.zip
+          if-no-files-found: error

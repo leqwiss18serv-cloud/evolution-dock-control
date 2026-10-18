@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Evolution Dock Control</string>
+    <string name="module_description">Zero-loop Hotseat height hook for Pixel Launcher and Launcher3.</string>
+</resources>
