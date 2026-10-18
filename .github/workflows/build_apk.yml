@@ -1,0 +1,78 @@
+name: Build LSPosed APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'lsposed/**'
+      - '.github/workflows/build_apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: assembleRelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Verify signing keystore
+        working-directory: lsposed
+        run: |
+          if [ -f keystore/dockcontrol.jks ] \
+             && keytool -list -keystore keystore/dockcontrol.jks \
+                  -storepass dockcontrol -alias dockcontrol >/dev/null 2>&1; then
+            echo "Committed keystore is valid - the APK signature will be stable."
+          else
+            echo "::warning::Committed keystore missing or unreadable, generating an ephemeral one."
+            rm -f keystore/dockcontrol.jks
+            mkdir -p keystore
+            keytool -genkeypair -v \
+              -keystore keystore/dockcontrol.jks \
+              -storetype PKCS12 \
+              -storepass dockcontrol \
+              -keypass dockcontrol \
+              -alias dockcontrol \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Evolution Dock Control, O=leqwiss18serv-cloud, C=RU"
+          fi
+
+      - name: Build release APK
+        working-directory: lsposed
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Collect artifact
+        run: |
+          mkdir -p dist
+          find lsposed/app/build/outputs/apk/release -name '*.apk' -exec cp {} dist/ \;
+          ls -la dist
+          test -n "$(ls -A dist)" || { echo "No APK produced"; exit 1; }
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: EvolutionDockControl-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30

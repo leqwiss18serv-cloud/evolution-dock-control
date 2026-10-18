@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        This is a *modern* libxposed module (API 101). Module metadata is NOT declared here:
+          META-INF/xposed/module.prop    - API requirements / exception mode
+          META-INF/xposed/java_init.list - entry class
+          META-INF/xposed/scope.list     - default scope (launcher packages)
+        android:label / android:description are read by LSPosed as the module name/description.
+    -->
+    <application
+        android:allowBackup="false"
+        android:description="@string/module_description"
+        android:icon="@drawable/ic_dock"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

@@ -1,0 +1,20 @@
+# Build outputs
+dist/
+build/
+.gradle/
+*.iml
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NOTE: lsposed/keystore/dockcontrol.jks is committed on purpose (public hobby module,
+# public password). It only keeps the APK signature stable between CI builds.

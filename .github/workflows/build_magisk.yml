@@ -1,0 +1,63 @@
+name: Build Magisk Module
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'magisk/**'
+      - '.github/workflows/build_magisk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: package zip
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read module version
+        id: meta
+        run: |
+          version=$(grep -E '^version=' magisk/module.prop | cut -d= -f2 | tr -d '\r')
+          echo "version=${version:-v0.0.0}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate module structure
+        run: |
+          set -e
+          for f in module.prop customize.sh action.sh service.sh uninstall.sh common.sh \
+                   META-INF/com/google/android/update-binary \
+                   META-INF/com/google/android/updater-script \
+                   system/bin/dockctl; do
+            test -f "magisk/$f" || { echo "missing magisk/$f"; exit 1; }
+          done
+          sh -n magisk/action.sh
+          sh -n magisk/common.sh
+          sh -n magisk/service.sh
+          sh -n magisk/customize.sh
+          sh -n magisk/uninstall.sh
+          sh -n magisk/system/bin/dockctl
+          echo "structure OK"
+
+      - name: Package ZIP
+        run: |
+          mkdir -p dist
+          cd magisk
+          zip -r9 "../dist/evolution-dock-control-magisk-${{ steps.meta.outputs.version }}.zip" . \
+            -x '.*' -x '*/.*'
+          cd ..
+          ls -la dist
+          unzip -l dist/*.zip | head -30
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: EvolutionDockControl-magisk
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30

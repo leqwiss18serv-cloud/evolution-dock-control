@@ -1,0 +1,15 @@
+# libxposed / LSPosed module metadata (modern API).
+# Read by the framework at module load time.
+
+# Minimum Xposed API the module needs. 101 = first stable libxposed API.
+minApiVersion=101
+
+# API the module was compiled and tested against.
+targetApiVersion=101
+
+# The scope is fixed by the module: users should not be able to apply it to other apps.
+staticScope=true
+
+# protective = any exception thrown by a hook is logged and the original method proceeds.
+# This is what makes the module bootloop-proof.
+exceptionMode=protective

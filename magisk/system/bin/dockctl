@@ -1,0 +1,39 @@
+#!/system/bin/sh
+# Evolution Dock Control - terminal helper, mounted into /system/bin.
+#
+#   dockctl            -> status
+#   dockctl on|hide    -> hide the dock
+#   dockctl off|show   -> show the dock
+#   dockctl toggle     -> flip the current state
+#   dockctl menu       -> interactive menu
+#
+# Requires root (run as `su -c dockctl ...`).
+
+MODDIR=/data/adb/modules/evolution_dock_control
+. "$MODDIR/common.sh"
+
+case "$1" in
+  ""|status)
+    dock_status
+    ;;
+  on|hide)
+    dock_apply 1
+    ;;
+  off|show)
+    dock_apply 0
+    ;;
+  toggle)
+    if [ "$(dock_state)" = "1" ]; then
+      dock_apply 0
+    else
+      dock_apply 1
+    fi
+    ;;
+  menu)
+    exec "$MODDIR/action.sh"
+    ;;
+  *)
+    echo "usage: dockctl [status|on|off|toggle|menu]"
+    exit 1
+    ;;
+esac

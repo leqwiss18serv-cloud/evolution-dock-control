@@ -1,0 +1,15 @@
+# Shell scripts run on Android: CRLF would break them ("bad interpreter" / stray \r).
+* text=auto eol=lf
+*.sh text eol=lf
+*.prop text eol=lf
+*.list text eol=lf
+*.yml text eol=lf
+*.kts text eol=lf
+*.kt text eol=lf
+update-binary text eol=lf
+updater-script text eol=lf
+
+# Binary
+*.jks binary
+*.zip binary
+*.apk binary

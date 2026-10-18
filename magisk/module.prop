@@ -1,0 +1,6 @@
+id=evolution_dock_control
+name=Evolution Dock Control
+version=v1.0.0
+versionCode=1
+author=leqwiss18serv-cloud
+description=Переключает системный док (Hotseat) лаунчера на Evolution X / Android 16. Кнопка «Действие» в Magisk переключает состояние; значение хранится в Settings.Secure (evolution_dock_hidden) и подхватывается модулем LSPosed. Без демонов, без циклов, полностью обратимо.

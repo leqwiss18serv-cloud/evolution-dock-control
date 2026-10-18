@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dock Control</string>
+    <string name="module_description">Скрывает Hotseat (док) в Pixel Launcher / Launcher3 на Evolution X. Без фоновых процессов, полностью обратимо. / Hides the Launcher3 hotseat with zero background work.</string>
+
+    <string name="status_hidden">Док: СКРЫТ</string>
+    <string name="status_visible">Док: ПОКАЗАН</string>
+
+    <string name="btn_hide">Скрыть док</string>
+    <string name="btn_show">Показать док</string>
+    <string name="btn_restart">Перезапустить лаунчер</string>
+
+    <string name="hint">Кнопки выполняют root-команды через su и перезапускают лаунчер.\nКлюч: secure evolution_dock_hidden (1 = скрыт, 0 = показан).\nМодуль активируется в LSPosed: включить модуль + выбрать приложение лаунчера в области действия.</string>
+</resources>
