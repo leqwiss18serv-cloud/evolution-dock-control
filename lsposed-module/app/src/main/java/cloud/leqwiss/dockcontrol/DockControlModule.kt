@@ -2,6 +2,7 @@ package cloud.leqwiss.dockcontrol
 
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.util.Log
 import android.view.View
@@ -109,6 +110,27 @@ class DockControlModule : XposedModule() {
     }
 
     private fun hookLifecycle(hotseatClass: Class<*>) {
+        val setInsets = runCatching {
+            hotseatClass.getDeclaredMethod("setInsets", Rect::class.java)
+        }.getOrNull()
+        setInsets?.let { method ->
+            hook(method)
+                .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                .intercept { chain ->
+                    try {
+                        val result = chain.proceed()
+                        (chain.thisObject as? View)?.let { view ->
+                            hotseatViews.add(WeakReference(view))
+                            applyStyle(view)
+                        }
+                        result
+                    } catch (throwable: Throwable) {
+                        log(Log.WARN, TAG, "setInsets hook failed", throwable)
+                        chain.proceed()
+                    }
+                }
+        }
+
         val onFinishInflate = runCatching {
             hotseatClass.getDeclaredMethod("onFinishInflate")
         }.getOrNull()
@@ -162,9 +184,17 @@ class DockControlModule : XposedModule() {
                 cornerRadius = style.cornerRadiusDp * view.resources.displayMetrics.density
             }
             view.background = drawable
+            hideQsb(view)
             applyMargins(view)
         } catch (throwable: Throwable) {
             log(Log.WARN, TAG, "Applying dock style failed", throwable)
+        }
+    }
+
+    private fun hideQsb(view: View) {
+        runCatching {
+            val qsb = view.javaClass.getMethod("getQsb").invoke(view) as? View
+            qsb?.visibility = View.GONE
         }
     }
 

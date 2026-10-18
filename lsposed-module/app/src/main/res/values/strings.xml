@@ -14,6 +14,12 @@
     <string name="side_margin">Side margin</string>
     <string name="side_margin_value">Side margin: %1$d dp</string>
     <string name="service_unavailable">LSPosed service is not connected yet. Open this screen after enabling the module.</string>
+    <string name="root_status_pending">Checking root access…</string>
+    <string name="root_status_granted">Root access granted.</string>
+    <string name="root_status_denied">Root access unavailable: %1$s</string>
+    <string name="restart_launcher">Save &amp; restart launcher</string>
+    <string name="root_restart_running">Restarting launcher…</string>
+    <string name="root_restart_done">Launcher restarted.</string>
     <string name="settings_ready">Changes are applied on the next Hotseat creation.</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_read_failed">Could not read settings.</string>

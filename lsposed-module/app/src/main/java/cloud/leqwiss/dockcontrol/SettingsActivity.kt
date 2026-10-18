@@ -20,6 +20,8 @@ class SettingsActivity : Activity() {
 
     private var updatingUi = false
     private lateinit var statusView: TextView
+    private lateinit var rootStatusView: TextView
+    private lateinit var restartButton: Button
     private lateinit var colorInput: EditText
     private lateinit var opacitySlider: SeekBar
     private lateinit var radiusSlider: SeekBar
@@ -39,6 +41,7 @@ class SettingsActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(createContent())
         ServiceHolder.addListener(serviceListener)
+        requestRootAccess()
         loadSettings()
     }
 
@@ -62,6 +65,11 @@ class SettingsActivity : Activity() {
             setPadding(0, 16, 0, 24)
         }
         content.addView(statusView)
+        rootStatusView = TextView(this).apply {
+            setPadding(0, 0, 0, 24)
+            text = getString(R.string.root_status_pending)
+        }
+        content.addView(rootStatusView)
 
         content.addView(label(R.string.background_color))
         colorInput = EditText(this).apply {
@@ -105,6 +113,13 @@ class SettingsActivity : Activity() {
         sideLabel = label(R.string.side_margin)
         content.addView(sideLabel)
         sideSlider = createSlider(content, 100, DEFAULT_SIDE_MARGIN) { writeSettings() }
+
+        restartButton = Button(this).apply {
+            text = getString(R.string.restart_launcher)
+            isEnabled = false
+            setOnClickListener { restartLauncher() }
+        }
+        content.addView(restartButton)
 
         return ScrollView(this).apply { addView(content) }
     }
@@ -184,6 +199,37 @@ class SettingsActivity : Activity() {
         }
     }
 
+    private fun requestRootAccess() {
+        RootAccess.requestAccess { granted, output ->
+            runOnUiThread {
+                if (isDestroyed || isFinishing) return@runOnUiThread
+                restartButton.isEnabled = granted
+                rootStatusView.text = if (granted) {
+                    getString(R.string.root_status_granted)
+                } else {
+                    getString(R.string.root_status_denied, output)
+                }
+            }
+        }
+    }
+
+    private fun restartLauncher() {
+        writeSettings()
+        restartButton.isEnabled = false
+        rootStatusView.text = getString(R.string.root_restart_running)
+        RootAccess.runCommand(RESTART_LAUNCHER_COMMAND) { granted, output ->
+            runOnUiThread {
+                if (isDestroyed || isFinishing) return@runOnUiThread
+                restartButton.isEnabled = granted
+                rootStatusView.text = if (granted) {
+                    getString(R.string.root_restart_done)
+                } else {
+                    getString(R.string.root_status_denied, output)
+                }
+            }
+        }
+    }
+
     private fun updateLabels() {
         opacityLabel.text = getString(R.string.background_opacity_value, opacitySlider.progress)
         radiusLabel.text = getString(R.string.corner_radius_value, radiusSlider.progress)
@@ -207,6 +253,10 @@ class SettingsActivity : Activity() {
         const val DEFAULT_CORNER_RADIUS = 28
         const val DEFAULT_BOTTOM_MARGIN = 12
         const val DEFAULT_SIDE_MARGIN = 12
+        const val RESTART_LAUNCHER_COMMAND =
+            "am force-stop com.google.android.apps.nexuslauncher; " +
+                "am force-stop com.android.launcher3; " +
+                "am start -a android.intent.action.MAIN -c android.intent.category.HOME"
         val PRESET_COLORS = intArrayOf(
             Color.WHITE,
             Color.BLACK,
