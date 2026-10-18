@@ -1,7 +1,7 @@
 id=cloud_leqwiss_dockcontrol
 name=Evolution Dock Control
 author=leqwiss18serv-cloud
-description=Floating iOS-style dock with adaptive layout and compatibility mode.
+description=Adaptive floating dock with themes, precise layout and icon offsets.
 minApiVersion=102
 targetApiVersion=102
 staticScope=true
