@@ -3,3 +3,4 @@
 -keep,allowoptimization,allowobfuscation public class * extends io.github.libxposed.api.XposedModule {
     public <init>();
 }
+-keep class io.github.libxposed.service.** { *; }

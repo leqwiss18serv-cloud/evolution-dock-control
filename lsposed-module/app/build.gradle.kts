@@ -10,8 +10,8 @@ android {
         applicationId = "cloud.leqwiss.dockcontrol"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
     }
 
     buildTypes {
@@ -44,4 +44,6 @@ android {
 
 dependencies {
     compileOnly(libs.libxposed.api)
+    implementation(files("libs/libxposed-interface-102.0.0.aar"))
+    implementation(files("libs/libxposed-service-102.0.0.aar"))
 }

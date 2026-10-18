@@ -1,7 +1,7 @@
 id=cloud_leqwiss_dockcontrol
 name=Evolution Dock Control
 author=leqwiss18serv-cloud
-description=Zero-loop Hotseat height hook for Pixel Launcher and Launcher3.
+description=iOS-style floating Hotseat customization for Pixel Launcher and Launcher3.
 minApiVersion=102
 targetApiVersion=102
 staticScope=true

@@ -1,4 +1,21 @@
 <resources>
     <string name="app_name">Evolution Dock Control</string>
-    <string name="module_description">Zero-loop Hotseat height hook for Pixel Launcher and Launcher3.</string>
+    <string name="module_description">iOS-style floating Hotseat customization for Pixel Launcher and Launcher3.</string>
+    <string name="settings_title">Dock style</string>
+    <string name="background_color">Background color (HEX)</string>
+    <string name="apply_color">Apply</string>
+    <string name="color_palette">Color palette</string>
+    <string name="background_opacity">Background opacity</string>
+    <string name="background_opacity_value">Background opacity: %1$d%%</string>
+    <string name="corner_radius">Corner radius</string>
+    <string name="corner_radius_value">Corner radius: %1$d dp</string>
+    <string name="bottom_margin">Bottom margin</string>
+    <string name="bottom_margin_value">Bottom margin: %1$d dp</string>
+    <string name="side_margin">Side margin</string>
+    <string name="side_margin_value">Side margin: %1$d dp</string>
+    <string name="service_unavailable">LSPosed service is not connected yet. Open this screen after enabling the module.</string>
+    <string name="settings_ready">Changes are applied on the next Hotseat creation.</string>
+    <string name="settings_saved">Saved</string>
+    <string name="settings_read_failed">Could not read settings.</string>
+    <string name="settings_save_failed">Could not save settings.</string>
 </resources>
