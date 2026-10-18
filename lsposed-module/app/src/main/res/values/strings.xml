@@ -3,6 +3,10 @@
     <string name="app_name">Dock стиль</string>
     <string name="module_description">Парящий док в стиле iOS с точной настройкой положения и иконок.</string>
     <string name="settings_title">Настройки дока</string>
+    <string name="live_preview">Предпросмотр и live-редактор</string>
+    <string name="live_preview_hint">Тяните док пальцем, чтобы переместить. Тяните круговые маркеры, чтобы изменить размер.</string>
+    <string name="live_edit_enable">Включить изменение пальцем</string>
+    <string name="live_edit_disable">Выключить изменение пальцем</string>
     <string name="module_enabled">Включить модуль</string>
     <string name="adaptive_mode">Автоадаптация под текущий док</string>
     <string name="safe_mode">Безопасный режим совместимости</string>

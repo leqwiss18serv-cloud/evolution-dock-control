@@ -1,0 +1,235 @@
+package cloud.leqwiss.dockcontrol
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.util.AttributeSet
+import android.view.MotionEvent
+import android.view.View
+import kotlin.math.abs
+import kotlin.math.max
+
+class DockPreviewView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null
+) : View(context, attrs) {
+
+    var isInteractive: Boolean = true
+
+    var widthPercent: Float = DEFAULT_WIDTH_PERCENT
+    var heightDp: Int = DEFAULT_HEIGHT_DP
+    var leftMarginDp: Float = DEFAULT_HORIZONTAL_MARGIN.toFloat()
+    var rightMarginDp: Float = DEFAULT_HORIZONTAL_MARGIN.toFloat()
+    var topMarginDp: Float = DEFAULT_TOP_MARGIN.toFloat()
+    var bottomMarginDp: Float = DEFAULT_BOTTOM_MARGIN.toFloat()
+    var cornerRadiusDp: Float = DEFAULT_CORNER_RADIUS.toFloat()
+    var dockColor: Int = Color.argb((255 * DEFAULT_OPACITY) / 100, 28, 28, 30)
+    var dockGravity: String = GRAVITY_BOTTOM
+
+    var onDockChanged: ((left: Int, right: Int, top: Int, bottom: Int, height: Int) -> Unit)? = null
+
+    private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF101014.toInt()
+    }
+    private val dockPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFF2F2F7
+    }
+    private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x66FFFFFF
+    }
+    private val dockRect = RectF()
+
+    private var touchMode = TouchMode.NONE
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        canvas.drawRoundRect(
+            0f,
+            0f,
+            width.toFloat(),
+            height.toFloat(),
+            28.dpToPx(),
+            28.dpToPx(),
+            backgroundPaint
+        )
+
+        computeDockRect()
+        dockPaint.color = dockColor
+        canvas.drawRoundRect(dockRect, cornerRadiusDp.dpToPx(), cornerRadiusDp.dpToPx(), dockPaint)
+
+        val iconRadius = 13.dpToPx()
+        val iconCount = 4
+        val spacing = dockRect.width() / (iconCount + 1)
+        for (index in 1..iconCount) {
+            val centerX = dockRect.left + spacing * index
+            val centerY = dockRect.centerY()
+            canvas.drawCircle(centerX, centerY, iconRadius, iconPaint)
+        }
+
+        if (isInteractive) {
+            canvas.drawCircle(dockRect.centerX(), dockRect.top, 7.dpToPx(), handlePaint)
+            canvas.drawCircle(dockRect.centerX(), dockRect.bottom, 7.dpToPx(), handlePaint)
+            canvas.drawCircle(dockRect.left, dockRect.centerY(), 7.dpToPx(), handlePaint)
+            canvas.drawCircle(dockRect.right, dockRect.centerY(), 7.dpToPx(), handlePaint)
+        }
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!isInteractive) return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                computeDockRect()
+                touchMode = touchModeFor(event.x, event.y)
+                if (touchMode == TouchMode.NONE) return false
+                lastTouchX = event.x
+                lastTouchY = event.y
+                parent?.requestDisallowInterceptTouchEvent(true)
+                return true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (touchMode == TouchMode.NONE) return false
+                val deltaX = event.x - lastTouchX
+                val deltaY = event.y - lastTouchY
+                val density = resources.displayMetrics.density
+                val deltaXDp = deltaX / density
+                val deltaYDp = deltaY / density
+
+                when (touchMode) {
+                    TouchMode.MOVE -> {
+                        leftMarginDp = leftMarginDp.coerceIn(0f, MAX_MARGIN_DP) + deltaXDp
+                        rightMarginDp = rightMarginDp.coerceIn(0f, MAX_MARGIN_DP) - deltaXDp
+                        if (dockGravity == GRAVITY_BOTTOM) {
+                            bottomMarginDp = (bottomMarginDp - deltaYDp).coerceIn(0f, MAX_MARGIN_DP)
+                        } else {
+                            topMarginDp = (topMarginDp + deltaYDp).coerceIn(0f, MAX_MARGIN_DP)
+                        }
+                    }
+
+                    TouchMode.RESIZE_LEFT -> {
+                        leftMarginDp = (leftMarginDp + deltaXDp).coerceIn(0f, MAX_MARGIN_DP)
+                    }
+
+                    TouchMode.RESIZE_RIGHT -> {
+                        rightMarginDp = (rightMarginDp - deltaXDp).coerceIn(0f, MAX_MARGIN_DP)
+                    }
+
+                    TouchMode.RESIZE_TOP -> {
+                        val currentHeight = if (heightDp > 0) {
+                            heightDp
+                        } else {
+                            (dockRect.height() / density).toInt()
+                        }
+                        heightDp = (currentHeight - deltaYDp).toInt().coerceIn(MIN_HEIGHT_DP, MAX_HEIGHT_DP)
+                    }
+
+                    TouchMode.RESIZE_BOTTOM -> {
+                        val currentHeight = if (heightDp > 0) {
+                            heightDp
+                        } else {
+                            (dockRect.height() / density).toInt()
+                        }
+                        heightDp = (currentHeight + deltaYDp).toInt().coerceIn(MIN_HEIGHT_DP, MAX_HEIGHT_DP)
+                    }
+
+                    TouchMode.NONE -> return false
+                }
+
+                leftMarginDp = leftMarginDp.coerceIn(0f, MAX_MARGIN_DP)
+                rightMarginDp = rightMarginDp.coerceIn(0f, MAX_MARGIN_DP)
+                topMarginDp = topMarginDp.coerceIn(0f, MAX_MARGIN_DP)
+                bottomMarginDp = bottomMarginDp.coerceIn(0f, MAX_MARGIN_DP)
+                lastTouchX = event.x
+                lastTouchY = event.y
+                invalidate()
+                onDockChanged?.invoke(
+                    leftMarginDp.toInt(),
+                    rightMarginDp.toInt(),
+                    topMarginDp.toInt(),
+                    bottomMarginDp.toInt(),
+                    heightDp
+                )
+                return true
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                touchMode = TouchMode.NONE
+                parent?.requestDisallowInterceptTouchEvent(false)
+                return true
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+
+    private fun touchModeFor(x: Float, y: Float): TouchMode {
+        val edgeSize = 26.dpToPx()
+        val nearLeft = abs(x - dockRect.left) <= edgeSize
+        val nearRight = abs(x - dockRect.right) <= edgeSize
+        val nearTop = abs(y - dockRect.top) <= edgeSize
+        val nearBottom = abs(y - dockRect.bottom) <= edgeSize
+
+        return when {
+            nearLeft -> TouchMode.RESIZE_LEFT
+            nearRight -> TouchMode.RESIZE_RIGHT
+            nearTop -> TouchMode.RESIZE_TOP
+            nearBottom -> TouchMode.RESIZE_BOTTOM
+            dockRect.contains(x, y) -> TouchMode.MOVE
+            else -> TouchMode.NONE
+        }
+    }
+
+    private fun computeDockRect() {
+        val density = resources.displayMetrics.density
+        val horizontalPadding = 18.dpToPx()
+        val verticalPadding = 18.dpToPx()
+        val availableWidth = max(0f, width - horizontalPadding * 2)
+        val widthInset = availableWidth * (100f - widthPercent) / 200f
+        val left = horizontalPadding + widthInset + leftMarginDp * density
+        val right = width - horizontalPadding - widthInset - rightMarginDp * density
+        val dockWidth = max(70.dpToPx(), right - left)
+
+        val dockHeight = if (heightDp > 0) {
+            heightDp * density
+        } else {
+            96.dpToPx()
+        }
+
+        val top = if (dockGravity == GRAVITY_TOP) {
+            verticalPadding + topMarginDp * density
+        } else {
+            height - verticalPadding - bottomMarginDp * density - dockHeight
+        }
+        dockRect.set(left, top, left + dockWidth, top + dockHeight)
+    }
+
+    private fun Float.dpToPx(): Float = this * resources.displayMetrics.density
+
+    private enum class TouchMode {
+        NONE,
+        MOVE,
+        RESIZE_LEFT,
+        RESIZE_RIGHT,
+        RESIZE_TOP,
+        RESIZE_BOTTOM
+    }
+
+    companion object {
+        const val GRAVITY_BOTTOM = "bottom"
+        const val GRAVITY_TOP = "top"
+        const val DEFAULT_WIDTH_PERCENT = 78f
+        const val DEFAULT_HEIGHT_DP = 0
+        const val DEFAULT_CORNER_RADIUS = 34f
+        const val DEFAULT_OPACITY = 82
+        const val DEFAULT_TOP_MARGIN = 0
+        const val DEFAULT_BOTTOM_MARGIN = 16
+        const val DEFAULT_HORIZONTAL_MARGIN = 14
+        const val MAX_MARGIN_DP = 120f
+        const val MIN_HEIGHT_DP = 60
+        const val MAX_HEIGHT_DP = 220
+    }
+}

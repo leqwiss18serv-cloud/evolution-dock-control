@@ -5,7 +5,6 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.InsetDrawable
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -89,7 +88,10 @@ class DockControlModule : XposedModule() {
         currentStyle = newStyle
         hotseatViews.removeIf { reference -> reference.get() == null }
         hotseatViews.forEach { reference ->
-            reference.get()?.let(::applyStyle)
+            reference.get()?.let { view ->
+                applyStyle(view)
+                view.requestLayout()
+            }
         }
     }
 
@@ -207,7 +209,7 @@ class DockControlModule : XposedModule() {
     }
 
     private fun applyStyle(view: View?) {
-        if (view == null) return
+        if (view == null || view.layoutParams == null) return
         try {
             val style = currentStyle
             if (!style.enabled) {
@@ -222,40 +224,18 @@ class DockControlModule : XposedModule() {
             }
 
             if (!style.forceBackground && state.background != null) {
+                applyMargins(view)
+                applyDimensions(view)
                 applyIconOffsets(view)
                 return
             }
 
             val density = view.resources.displayMetrics.density
-            val gradient = GradientDrawable().apply {
+            val background = GradientDrawable().apply {
                 setColor(style.backgroundColor)
                 cornerRadius = style.cornerRadiusDp * density
             }
-
-            val parentView = view.parent as? ViewGroup
-            val parentWidth = when {
-                parentView != null && parentView.width > 0 -> parentView.width
-                view.width > 0 -> view.width
-                view.rootView.width > 0 -> view.rootView.width
-                else -> 0
-            }
-            val horizontalInset = if (parentWidth > 0) {
-                (parentWidth * (100 - style.widthPercent) / 200)
-            } else {
-                0
-            }
-            val insetLeft = horizontalInset.coerceAtLeast(0)
-            val insetRight = horizontalInset.coerceAtLeast(0)
-            val insetTop = 0
-            val insetBottom = 0
-
-            view.background = InsetDrawable(gradient, insetLeft, insetTop, insetRight, insetBottom)
-            view.setPadding(
-                state.paddingLeft + insetLeft,
-                state.paddingTop + insetTop,
-                state.paddingRight + insetRight,
-                state.paddingBottom + insetBottom
-            )
+            view.background = background
 
             if (style.hideSearch) {
                 hideQsb(view)
@@ -276,10 +256,22 @@ class DockControlModule : XposedModule() {
             val layoutParams = view.layoutParams as? ViewGroup.MarginLayoutParams ?: return
             val style = currentStyle
             val density = view.resources.displayMetrics.density
-            val leftMargin = (style.leftMarginDp * density).toInt()
+            val parentView = view.parent as? ViewGroup
+            val parentWidth = when {
+                parentView != null && parentView.width > 0 -> parentView.width
+                view.rootView.width > 0 -> view.rootView.width
+                else -> 0
+            }
+            val widthInset = if (parentWidth > 0) {
+                (parentWidth * (100 - style.widthPercent) / 200)
+            } else {
+                0
+            }
+            val leftMargin = widthInset + (style.leftMarginDp * density).toInt()
             val topMargin = (style.topMarginDp * density).toInt()
-            val rightMargin = (style.rightMarginDp * density).toInt()
+            val rightMargin = widthInset + (style.rightMarginDp * density).toInt()
             val bottomMargin = (style.bottomMarginDp * density).toInt()
+
             if (layoutParams.leftMargin != leftMargin ||
                 layoutParams.topMargin != topMargin ||
                 layoutParams.rightMargin != rightMargin ||
@@ -305,6 +297,11 @@ class DockControlModule : XposedModule() {
             }
 
             var changed = false
+            if (layoutParams.width != ViewGroup.LayoutParams.MATCH_PARENT) {
+                layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
+                changed = true
+            }
+
             if (layoutParams.height != desiredHeight) {
                 layoutParams.height = desiredHeight
                 changed = true
@@ -318,6 +315,7 @@ class DockControlModule : XposedModule() {
 
             if (changed) {
                 view.layoutParams = layoutParams
+                view.requestLayout()
             }
         } catch (throwable: Throwable) {
             log(Log.WARN, TAG, "Applying dock dimensions failed", throwable)
@@ -334,6 +332,7 @@ class DockControlModule : XposedModule() {
             val translationY = style.iconOffsetYDp * density
             if (container.translationX != translationX) container.translationX = translationX
             if (container.translationY != translationY) container.translationY = translationY
+            container.requestLayout()
         } catch (throwable: Throwable) {
             log(Log.WARN, TAG, "Applying icon offsets failed", throwable)
         }
@@ -423,15 +422,15 @@ class DockControlModule : XposedModule() {
                 forceBackground = readBoolean(KEY_FORCE_BACKGROUND, true),
                 hideSearch = readBoolean(KEY_HIDE_SEARCH, false),
                 backgroundColor = readColor(getString(KEY_BACKGROUND_COLOR, DEFAULT_COLOR)),
-                cornerRadiusDp = readInt(KEY_CORNER_RADIUS, DEFAULT_CORNER_RADIUS, 0, 50),
-                topMarginDp = readInt(KEY_TOP_MARGIN, DEFAULT_TOP_MARGIN, 0, 100),
-                bottomMarginDp = readInt(KEY_BOTTOM_MARGIN, DEFAULT_BOTTOM_MARGIN, 0, 100),
-                leftMarginDp = readInt(KEY_LEFT_MARGIN, DEFAULT_HORIZONTAL_MARGIN, 0, 100),
-                rightMarginDp = readInt(KEY_RIGHT_MARGIN, DEFAULT_HORIZONTAL_MARGIN, 0, 100),
-                widthPercent = readInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT, 50, 100),
-                heightDp = readInt(KEY_HEIGHT_DP, DEFAULT_HEIGHT_DP, 0, 200),
-                iconOffsetXDp = readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -50, 50),
-                iconOffsetYDp = readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -50, 50),
+                cornerRadiusDp = readInt(KEY_CORNER_RADIUS, DEFAULT_CORNER_RADIUS, 0, 60),
+                topMarginDp = readInt(KEY_TOP_MARGIN, DEFAULT_TOP_MARGIN, 0, 120),
+                bottomMarginDp = readInt(KEY_BOTTOM_MARGIN, DEFAULT_BOTTOM_MARGIN, 0, 120),
+                leftMarginDp = readInt(KEY_LEFT_MARGIN, DEFAULT_HORIZONTAL_MARGIN, 0, 120),
+                rightMarginDp = readInt(KEY_RIGHT_MARGIN, DEFAULT_HORIZONTAL_MARGIN, 0, 120),
+                widthPercent = readInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT, 40, 100),
+                heightDp = readInt(KEY_HEIGHT_DP, DEFAULT_HEIGHT_DP, 0, 220),
+                iconOffsetXDp = readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -80, 80),
+                iconOffsetYDp = readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -80, 80),
                 dockGravity = getString(KEY_DOCK_GRAVITY, GRAVITY_BOTTOM) ?: GRAVITY_BOTTOM
             )
         } catch (throwable: Throwable) {
@@ -576,11 +575,11 @@ class DockControlModule : XposedModule() {
         const val GRAVITY_RIGHT = "right"
         const val DEFAULT_COLOR = "#1C1C1E"
         const val DEFAULT_OPACITY = 82
-        const val DEFAULT_CORNER_RADIUS = 32
+        const val DEFAULT_CORNER_RADIUS = 34
         const val DEFAULT_TOP_MARGIN = 0
-        const val DEFAULT_BOTTOM_MARGIN = 14
+        const val DEFAULT_BOTTOM_MARGIN = 16
         const val DEFAULT_HORIZONTAL_MARGIN = 14
-        const val DEFAULT_WIDTH_PERCENT = 100
+        const val DEFAULT_WIDTH_PERCENT = 78
         const val DEFAULT_HEIGHT_DP = 0
         const val DEFAULT_ICON_OFFSET = 0
         val TARGET_PACKAGES = setOf(

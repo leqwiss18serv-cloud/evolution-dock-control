@@ -1,6 +1,7 @@
 package cloud.leqwiss.dockcontrol
 
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.os.Bundle
 import android.widget.EditText
 import android.widget.TextView
@@ -43,6 +44,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var iconOffsetXLabel: TextView
     private lateinit var iconOffsetYLabel: TextView
     private lateinit var restartButton: MaterialButton
+    private lateinit var dockPreview: DockPreviewView
+    private var liveEditing = true
+    private var currentPreviewPosition = GRAVITY_BOTTOM
 
     private val serviceListener: () -> Unit = {
         runOnUiThread {
@@ -96,6 +100,7 @@ class SettingsActivity : AppCompatActivity() {
         iconOffsetXLabel = findViewById(R.id.iconOffsetXLabel)
         iconOffsetYLabel = findViewById(R.id.iconOffsetYLabel)
         restartButton = findViewById(R.id.restartButton)
+        dockPreview = findViewById(R.id.dockPreview)
     }
 
     private fun setupListeners() {
@@ -108,6 +113,7 @@ class SettingsActivity : AppCompatActivity() {
         listOf(opacitySlider, radiusSlider, topSlider, bottomSlider, leftSlider, rightSlider, widthSlider, heightSlider, iconOffsetXSlider, iconOffsetYSlider)
             .forEach { slider ->
                 slider.addOnChangeListener { _, _, _ -> updateLabels() }
+                slider.addOnChangeListener { _, _, _ -> updatePreview() }
                 slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
                     override fun onStartTrackingTouch(slider: Slider) = Unit
                     override fun onStopTrackingTouch(slider: Slider) = saveSettings()
@@ -155,6 +161,27 @@ class SettingsActivity : AppCompatActivity() {
 
         findViewById<MaterialButton>(R.id.resetButton).setOnClickListener { resetSettings() }
         restartButton.setOnClickListener { restartLauncher() }
+
+        dockPreview.isInteractive = liveEditing
+        dockPreview.onDockChanged = { left, right, top, bottom, height ->
+            updatingUi = true
+            leftSlider.value = left.toFloat()
+            rightSlider.value = right.toFloat()
+            topSlider.value = top.toFloat()
+            bottomSlider.value = bottom.toFloat()
+            heightSlider.value = height.toFloat()
+            updatingUi = false
+            updateLabels()
+            saveSettings()
+        }
+
+        findViewById<MaterialButton>(R.id.liveEditButton).setOnClickListener { button ->
+            liveEditing = !liveEditing
+            dockPreview.isInteractive = liveEditing
+            button.text = getString(
+                if (liveEditing) R.string.live_edit_disable else R.string.live_edit_enable
+            )
+        }
     }
 
     private fun loadSettings() {
@@ -172,18 +199,32 @@ class SettingsActivity : AppCompatActivity() {
             forceBackgroundSwitch.isChecked = prefs.readBoolean(KEY_FORCE_BACKGROUND, true)
             hideSearchSwitch.isChecked = prefs.readBoolean(KEY_HIDE_SEARCH, false)
             colorInput.setText(prefs.getString(KEY_BACKGROUND_COLOR, DEFAULT_COLOR) ?: DEFAULT_COLOR)
+            val layoutVersion = prefs.readInt(KEY_LAYOUT_VERSION, 0, 0, Int.MAX_VALUE)
             opacitySlider.value = prefs.readInt(KEY_BACKGROUND_OPACITY, DEFAULT_OPACITY, 0, 100).toFloat()
             radiusSlider.value = prefs.readInt(KEY_CORNER_RADIUS, DEFAULT_CORNER_RADIUS, 0, 50).toFloat()
             topSlider.value = prefs.readInt(KEY_TOP_MARGIN, DEFAULT_TOP_MARGIN, 0, 100).toFloat()
             bottomSlider.value = prefs.readInt(KEY_BOTTOM_MARGIN, DEFAULT_BOTTOM_MARGIN, 0, 100).toFloat()
             leftSlider.value = prefs.readInt(KEY_LEFT_MARGIN, DEFAULT_HORIZONTAL_MARGIN, 0, 100).toFloat()
             rightSlider.value = prefs.readInt(KEY_RIGHT_MARGIN, DEFAULT_HORIZONTAL_MARGIN, 0, 100).toFloat()
-            widthSlider.value = prefs.readInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT, 50, 100).toFloat()
+            widthSlider.value = prefs.readInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT, 40, 100).toFloat()
             heightSlider.value = prefs.readInt(KEY_HEIGHT_DP, DEFAULT_HEIGHT_DP, 0, 200).toFloat()
             iconOffsetXSlider.value = prefs.readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             iconOffsetYSlider.value = prefs.readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
+            if (layoutVersion < 4) {
+                radiusSlider.value = 34f
+                bottomSlider.value = 16f
+                widthSlider.value = 78f
+                prefs.edit()
+                    .putInt(KEY_CORNER_RADIUS, 34)
+                    .putInt(KEY_BOTTOM_MARGIN, 16)
+                    .putInt(KEY_WIDTH_PERCENT, 78)
+                    .putInt(KEY_LAYOUT_VERSION, 4)
+                    .apply()
+            }
             updatingUi = false
-            updateLabels(prefs.getString(KEY_DOCK_GRAVITY, GRAVITY_BOTTOM) ?: GRAVITY_BOTTOM)
+            val position = prefs.getString(KEY_DOCK_GRAVITY, GRAVITY_BOTTOM) ?: GRAVITY_BOTTOM
+            updateLabels(position)
+            updatePreview(position)
             statusView.text = getString(R.string.settings_ready)
         }.onFailure {
             updatingUi = false
@@ -217,6 +258,7 @@ class SettingsActivity : AppCompatActivity() {
             editor.putInt(KEY_ICON_OFFSET_X, iconOffsetXSlider.value.toInt())
             editor.putInt(KEY_ICON_OFFSET_Y, iconOffsetYSlider.value.toInt())
             editor.apply()
+            updatePreview()
             statusView.text = getString(R.string.settings_saved)
         }.onFailure {
             statusView.text = getString(R.string.settings_save_failed)
@@ -231,6 +273,7 @@ class SettingsActivity : AppCompatActivity() {
                 .putString(KEY_DOCK_GRAVITY, position)
                 .apply()
             updateLabels(position)
+            updatePreview(position)
         }
     }
 
@@ -321,6 +364,30 @@ class SettingsActivity : AppCompatActivity() {
         )
     }
 
+    private fun updatePreview(position: String = currentPreviewPosition) {
+        currentPreviewPosition = position
+        dockPreview.widthPercent = widthSlider.value
+        dockPreview.heightDp = heightSlider.value.toInt()
+        dockPreview.leftMarginDp = leftSlider.value
+        dockPreview.rightMarginDp = rightSlider.value
+        dockPreview.topMarginDp = topSlider.value
+        dockPreview.bottomMarginDp = bottomSlider.value
+        dockPreview.cornerRadiusDp = radiusSlider.value
+        dockPreview.dockGravity = position
+        dockPreview.dockColor = try {
+            val base = Color.parseColor(colorInput.text.toString().trim().ifEmpty { DEFAULT_COLOR })
+            Color.argb(
+                (255 * opacitySlider.value.toInt()) / 100,
+                Color.red(base),
+                Color.green(base),
+                Color.blue(base)
+            )
+        } catch (throwable: Throwable) {
+            Color.argb((255 * DEFAULT_OPACITY) / 100, 28, 28, 30)
+        }
+        dockPreview.invalidate()
+    }
+
     private fun SharedPreferences.readBoolean(key: String, default: Boolean): Boolean {
         return try {
             when (val rawValue = all[key]) {
@@ -364,6 +431,7 @@ class SettingsActivity : AppCompatActivity() {
         const val KEY_ICON_OFFSET_X = "icon_offset_x"
         const val KEY_ICON_OFFSET_Y = "icon_offset_y"
         const val KEY_DOCK_GRAVITY = "dock_gravity"
+        const val KEY_LAYOUT_VERSION = "layout_version"
         const val GRAVITY_BOTTOM = "bottom"
         const val GRAVITY_TOP = "top"
         const val GRAVITY_LEFT = "left"
