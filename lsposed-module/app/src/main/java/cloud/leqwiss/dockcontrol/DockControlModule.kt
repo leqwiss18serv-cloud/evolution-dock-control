@@ -7,8 +7,7 @@ import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 
-class DockControlModule(base: XposedInterface, param: PackageLoadedParam) :
-    XposedModule(base, param) {
+class DockControlModule : XposedModule() {
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (param.packageName !in TARGET_PACKAGES) return
