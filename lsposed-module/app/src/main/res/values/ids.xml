@@ -4,4 +4,6 @@
     <item name="dock_qsb_visible" type="id" />
     <item name="dock_hide_runnable" type="id" />
     <item name="dock_hidden" type="id" />
+    <item name="dock_background_key" type="id" />
+    <item name="dock_icons_container" type="id" />
 </resources>

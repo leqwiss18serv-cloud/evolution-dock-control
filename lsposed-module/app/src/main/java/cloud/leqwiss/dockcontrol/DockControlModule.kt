@@ -19,6 +19,7 @@ import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArraySet
+import kotlin.math.abs
 
 class DockControlModule : XposedModule() {
 
@@ -290,8 +291,15 @@ class DockControlModule : XposedModule() {
                 return
             }
 
-            view.background = createBackground(style, view.resources.displayMetrics.density)
-            view.setLayerType(View.LAYER_TYPE_NONE, null)
+            val density = view.resources.displayMetrics.density
+            val backgroundKey = backgroundKey(style, density)
+            if (view.getTag(R.id.dock_background_key) != backgroundKey || view.background == null) {
+                view.background = createBackground(style, density)
+                view.setTag(R.id.dock_background_key, backgroundKey)
+            }
+            if (view.layerType != View.LAYER_TYPE_NONE) {
+                view.setLayerType(View.LAYER_TYPE_NONE, null)
+            }
             if (style.hideSearch) hideQsb(view) else showQsb(view)
             applyGeometry(view, style)
             applyAutoHide(view)
@@ -359,44 +367,87 @@ class DockControlModule : XposedModule() {
         )
     }
 
+    private fun backgroundKey(style: DockStyle, density: Float): String {
+        return "${style.glassStyle}|${style.backgroundColor}|${style.cornerRadiusDp}|$density"
+    }
+
     private fun applyGeometry(view: View, style: DockStyle) {
         val layoutParams = view.layoutParams ?: return
         val density = view.resources.displayMetrics.density
         val parentView = view.parent as? View
         val parentWidth = parentView?.width ?: 0
+        var layoutChanged = false
 
         if (layoutParams is ViewGroup.MarginLayoutParams) {
-            layoutParams.leftMargin = (style.leftMarginDp * density).toInt()
-            layoutParams.topMargin = (style.topMarginDp * density).toInt()
-            layoutParams.rightMargin = (style.rightMarginDp * density).toInt()
-            layoutParams.bottomMargin = (style.bottomMarginDp * density).toInt()
+            val forceFullScreen = style.widthPercent >= 100
+            val leftMargin = if (forceFullScreen) 0 else (style.leftMarginDp * density).toInt()
+            val rightMargin = if (forceFullScreen) 0 else (style.rightMarginDp * density).toInt()
+            val topMargin = (style.topMarginDp * density).toInt()
+            val bottomMargin = (style.bottomMarginDp * density).toInt()
+            if (layoutParams.leftMargin != leftMargin) {
+                layoutParams.leftMargin = leftMargin
+                layoutChanged = true
+            }
+            if (layoutParams.topMargin != topMargin) {
+                layoutParams.topMargin = topMargin
+                layoutChanged = true
+            }
+            if (layoutParams.rightMargin != rightMargin) {
+                layoutParams.rightMargin = rightMargin
+                layoutChanged = true
+            }
+            if (layoutParams.bottomMargin != bottomMargin) {
+                layoutParams.bottomMargin = bottomMargin
+                layoutChanged = true
+            }
         }
 
         val forceFullScreen = style.widthPercent >= 100
-        if (forceFullScreen) {
-            layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
+        val desiredWidth = if (forceFullScreen) {
+            ViewGroup.LayoutParams.MATCH_PARENT
         } else if (style.adaptive && parentWidth > 0) {
-            layoutParams.width = (parentWidth * style.widthPercent / 100).coerceAtLeast(1)
+            (parentWidth * style.widthPercent / 100).coerceAtLeast(1)
+        } else {
+            layoutParams.width
+        }
+        if (layoutParams.width != desiredWidth) {
+            layoutParams.width = desiredWidth
+            layoutChanged = true
         }
 
-        if (style.adaptive || forceFullScreen) {
-            layoutParams.height = if (style.heightDp > 0) {
+        if (forceFullScreen) {
+            val desiredHeight = if (style.heightDp > 0) {
                 (style.heightDp * density).toInt()
             } else {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             }
-        }
-
-        if (forceFullScreen && layoutParams is ViewGroup.MarginLayoutParams) {
-            layoutParams.leftMargin = 0
-            layoutParams.rightMargin = 0
+            if (layoutParams.height != desiredHeight) {
+                layoutParams.height = desiredHeight
+                layoutChanged = true
+            }
+        } else if (style.adaptive) {
+            val desiredHeight = if (style.heightDp > 0) {
+                (style.heightDp * density).toInt()
+            } else {
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            if (layoutParams.height != desiredHeight) {
+                layoutParams.height = desiredHeight
+                layoutChanged = true
+            }
         }
 
         if (layoutParams is FrameLayout.LayoutParams) {
-            layoutParams.gravity = gravityFor(style.dockGravity)
+            val desiredGravity = gravityFor(style.dockGravity)
+            if (layoutParams.gravity != desiredGravity) {
+                layoutParams.gravity = desiredGravity
+                layoutChanged = true
+            }
         }
 
-        view.layoutParams = layoutParams
+        if (layoutChanged) {
+            view.layoutParams = layoutParams
+        }
         centerChildren(view)
     }
 
@@ -404,25 +455,58 @@ class DockControlModule : XposedModule() {
         if (view !is ViewGroup) return
         val offsetX = currentStyle.iconOffsetXDp * view.resources.displayMetrics.density
         val offsetY = currentStyle.iconOffsetYDp * view.resources.displayMetrics.density
-        val contentBounds = contentBounds(view) ?: return
-        val currentCenterX = contentBounds.centerX()
-        val currentCenterY = contentBounds.centerY()
+        val iconsContainer = findIconsContainer(view) ?: return
+        val contentBounds = contentBounds(iconsContainer) ?: return
+        val currentCenterX = contentBounds.centerX
+        val currentCenterY = contentBounds.centerY
         val targetCenterX = view.width / 2f + offsetX
         val targetCenterY = view.height / 2f + offsetY
-        for (index in 0 until view.childCount) {
-            val child = view.getChildAt(index)
-            child.translationX += targetCenterX - currentCenterX
-            child.translationY += targetCenterY - currentCenterY
+
+        val deltaX = targetCenterX - currentCenterX
+        val deltaY = targetCenterY - currentCenterY
+        if (abs(deltaX) > 0.25f) {
+            iconsContainer.translationX += deltaX
+        }
+        if (abs(deltaY) > 0.25f) {
+            iconsContainer.translationY += deltaY
         }
     }
 
-    private fun contentBounds(parent: ViewGroup, offsetX: Int = 0, offsetY: Int = 0): Rect? {
-        var bounds: Rect? = null
+    private fun findIconsContainer(view: ViewGroup): ViewGroup? {
+        view.getTag(R.id.dock_icons_container)?.let { return it as? ViewGroup }
+        val byMethod = runCatching {
+            view.javaClass
+                .getMethod("getShortcutsAndWidgets")
+                .invoke(view) as? ViewGroup
+        }.getOrNull()
+        if (byMethod != null) {
+            view.setTag(R.id.dock_icons_container, byMethod)
+            return byMethod
+        }
+
+        for (index in 0 until view.childCount) {
+            val child = view.getChildAt(index)
+            if (child is ViewGroup &&
+                child.javaClass.simpleName.contains("ShortcutAndWidgetContainer")
+            ) {
+                view.setTag(R.id.dock_icons_container, child)
+                return child
+            }
+        }
+        return null
+    }
+
+    private fun contentBounds(
+        parent: ViewGroup,
+        offsetX: Float = 0f,
+        offsetY: Float = 0f
+    ): ContentBounds? {
+        var bounds: ContentBounds? = null
         for (index in 0 until parent.childCount) {
             val child = parent.getChildAt(index)
-            if (child.visibility == View.GONE) continue
-            val childOffsetX = offsetX + child.left + child.translationX.toInt()
-            val childOffsetY = offsetY + child.top + child.translationY.toInt()
+            if (child.visibility != View.VISIBLE) continue
+            val childOffsetX = offsetX + child.left + child.translationX
+            val childOffsetY = offsetY + child.top + child.translationY
             if (child is ViewGroup) {
                 contentBounds(child, childOffsetX, childOffsetY)?.let { childBounds ->
                     if (bounds == null) {
@@ -432,17 +516,13 @@ class DockControlModule : XposedModule() {
                     }
                 }
             } else {
-                val childBounds = Rect(
-                    childOffsetX,
-                    childOffsetY,
-                    childOffsetX + child.width,
-                    childOffsetY + child.height
-                )
-                if (childBounds.isEmpty) continue
+                val childRight = childOffsetX + child.width
+                val childBottom = childOffsetY + child.height
+                if (childRight <= childOffsetX || childBottom <= childOffsetY) continue
                 if (bounds == null) {
-                    bounds = childBounds
+                    bounds = ContentBounds(childOffsetX, childOffsetY, childRight, childBottom)
                 } else {
-                    bounds?.union(childBounds)
+                    bounds.union(childOffsetX, childOffsetY, childRight, childBottom)
                 }
             }
         }
@@ -533,6 +613,7 @@ class DockControlModule : XposedModule() {
         cancelAutoHide(view)
         val state = view.getTag(R.id.dock_state) as? OriginalState ?: return
         view.background = state.background
+        view.setTag(R.id.dock_background_key, null)
         view.setLayerType(state.layerType, null)
         view.setPadding(state.paddingLeft, state.paddingTop, state.paddingRight, state.paddingBottom)
         view.translationY = state.translationY
@@ -692,6 +773,35 @@ class DockControlModule : XposedModule() {
         }
     }
 
+    private class ContentBounds(
+        left: Float,
+        top: Float,
+        right: Float,
+        bottom: Float
+    ) {
+        var left = left
+            private set
+        var top = top
+            private set
+        var right = right
+            private set
+        var bottom = bottom
+            private set
+
+        val centerX: Float
+            get() = (left + right) / 2f
+
+        val centerY: Float
+            get() = (top + bottom) / 2f
+
+        fun union(left: Float, top: Float, right: Float, bottom: Float) {
+            this.left = minOf(this.left, left)
+            this.top = minOf(this.top, top)
+            this.right = maxOf(this.right, right)
+            this.bottom = maxOf(this.bottom, bottom)
+        }
+    }
+
     private data class DockStyle(
         val enabled: Boolean,
         val safeMode: Boolean,
@@ -767,7 +877,7 @@ class DockControlModule : XposedModule() {
         const val KEY_AUTO_HIDE_SECONDS = "auto_hide_seconds"
         const val KEY_DOCK_GRAVITY = "dock_gravity"
         const val KEY_LAYOUT_VERSION = "layout_version"
-        const val LAYOUT_VERSION = 5
+        const val LAYOUT_VERSION = 6
         const val GRAVITY_BOTTOM = "bottom"
         const val GRAVITY_TOP = "top"
         const val GRAVITY_LEFT = "left"

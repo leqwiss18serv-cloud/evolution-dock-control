@@ -289,7 +289,7 @@ class DockPreviewView @JvmOverloads constructor(
         const val GLASS_STYLE_LIQUID = "liquid"
         const val GLASS_STYLE_MATTE = "matte"
         const val GLASS_STYLE_SOLID = "solid"
-        const val DEFAULT_WIDTH_PERCENT = 78f
+        const val DEFAULT_WIDTH_PERCENT = 100f
         const val DEFAULT_HEIGHT_DP = 0
         const val DEFAULT_CORNER_RADIUS = 34f
         const val DEFAULT_OPACITY = 82

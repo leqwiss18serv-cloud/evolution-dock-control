@@ -228,7 +228,7 @@ class SettingsActivity : AppCompatActivity() {
             iconOffsetXSlider.value = prefs.readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             iconOffsetYSlider.value = prefs.readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             autoHideSlider.value = prefs.readInt(KEY_AUTO_HIDE_SECONDS, 0, 0, 60).toFloat()
-            if (layoutVersion < 5) {
+            if (layoutVersion < 6) {
                 radiusSlider.value = 34f
                 bottomSlider.value = 16f
                 widthSlider.value = 100f
@@ -241,7 +241,7 @@ class SettingsActivity : AppCompatActivity() {
                     .putInt(KEY_LEFT_MARGIN, 0)
                     .putInt(KEY_RIGHT_MARGIN, 0)
                     .putBoolean(KEY_REAL_BLUR, false)
-                    .putInt(KEY_LAYOUT_VERSION, 5)
+                    .putInt(KEY_LAYOUT_VERSION, 6)
                     .apply()
             }
             updatingUi = false
@@ -434,7 +434,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun resetSettings() {
-        applyPreset(DEFAULT_COLOR, DEFAULT_OPACITY, DEFAULT_CORNER_RADIUS, DEFAULT_TOP_MARGIN, DEFAULT_BOTTOM_MARGIN, DEFAULT_HORIZONTAL_MARGIN, DEFAULT_HORIZONTAL_MARGIN, DEFAULT_WIDTH_PERCENT, DEFAULT_HEIGHT_DP, DEFAULT_ICON_OFFSET, DEFAULT_ICON_OFFSET)
+        applyPreset(DEFAULT_COLOR, DEFAULT_OPACITY, DEFAULT_CORNER_RADIUS, DEFAULT_TOP_MARGIN, DEFAULT_BOTTOM_MARGIN, 0, 0, DEFAULT_WIDTH_PERCENT, DEFAULT_HEIGHT_DP, DEFAULT_ICON_OFFSET, DEFAULT_ICON_OFFSET)
         savePosition(GRAVITY_BOTTOM)
     }
 
