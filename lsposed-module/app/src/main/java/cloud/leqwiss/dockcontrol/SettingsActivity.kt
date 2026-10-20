@@ -228,7 +228,7 @@ class SettingsActivity : AppCompatActivity() {
             iconOffsetXSlider.value = prefs.readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             iconOffsetYSlider.value = prefs.readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             autoHideSlider.value = prefs.readInt(KEY_AUTO_HIDE_SECONDS, 0, 0, 60).toFloat()
-            if (layoutVersion < 7) {
+            if (layoutVersion < 8) {
                 radiusSlider.value = 34f
                 bottomSlider.value = 16f
                 widthSlider.value = 78f
@@ -243,7 +243,7 @@ class SettingsActivity : AppCompatActivity() {
                     .putInt(KEY_RIGHT_MARGIN, 14)
                     .putInt(KEY_HEIGHT_DP, 0)
                     .putBoolean(KEY_REAL_BLUR, false)
-                    .putInt(KEY_LAYOUT_VERSION, 7)
+                    .putInt(KEY_LAYOUT_VERSION, 8)
                     .apply()
             }
             updatingUi = false

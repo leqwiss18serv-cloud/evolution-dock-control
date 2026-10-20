@@ -299,6 +299,9 @@ class DockControlModule : XposedModule() {
                 view.background = createBackground(style, density)
                 view.setTag(R.id.dock_background_key, backgroundKey)
             }
+            if (view.layerType != View.LAYER_TYPE_NONE) {
+                view.setLayerType(View.LAYER_TYPE_NONE, null)
+            }
             if (style.hideSearch) hideQsb(view) else showQsb(view)
             applyGeometry(view, style, state)
             applyAutoHide(view)
@@ -375,6 +378,11 @@ class DockControlModule : XposedModule() {
         val density = view.resources.displayMetrics.density
         val parentView = view.parent as? View
         val parentWidth = parentView?.width ?: 0
+        val availableWidth = when {
+            parentWidth > 0 -> parentWidth
+            view.rootView.width > 0 -> view.rootView.width
+            else -> view.resources.displayMetrics.widthPixels
+        }
         var layoutChanged = false
 
         if (layoutParams is ViewGroup.MarginLayoutParams) {
@@ -404,8 +412,8 @@ class DockControlModule : XposedModule() {
         val forceFullScreen = style.widthPercent >= 100
         val desiredWidth = if (forceFullScreen) {
             ViewGroup.LayoutParams.MATCH_PARENT
-        } else if (style.adaptive && parentWidth > 0) {
-            (parentWidth * style.widthPercent / 100).coerceAtLeast(1)
+        } else if (style.adaptive) {
+            (availableWidth * style.widthPercent / 100).coerceAtLeast(1)
         } else {
             layoutParams.width
         }
@@ -440,17 +448,14 @@ class DockControlModule : XposedModule() {
 
     private fun centerChildren(view: View) {
         if (view !is ViewGroup) return
+        if (view.width <= 0 || view.height <= 0) return
         val offsetX = currentStyle.iconOffsetXDp * view.resources.displayMetrics.density
         val offsetY = currentStyle.iconOffsetYDp * view.resources.displayMetrics.density
         val iconsContainer = findIconsContainer(view) ?: return
         val signature = centerSignature(view, iconsContainer)
         if (view.getTag(R.id.dock_center_signature) == signature) return
 
-        val contentBounds = contentBounds(
-            iconsContainer,
-            iconsContainer.translationX,
-            iconsContainer.translationY
-        ) ?: return
+        val contentBounds = contentBounds(iconsContainer) ?: return
         val currentCenterX = contentBounds.centerX
         val currentCenterY = contentBounds.centerY
         val targetCenterX = view.width / 2f + offsetX
@@ -458,12 +463,8 @@ class DockControlModule : XposedModule() {
 
         val deltaX = targetCenterX - currentCenterX
         val deltaY = targetCenterY - currentCenterY
-        if (abs(deltaX) > 0.25f) {
-            iconsContainer.translationX += deltaX
-        }
-        if (abs(deltaY) > 0.25f) {
-            iconsContainer.translationY += deltaY
-        }
+        iconsContainer.translationX = if (abs(deltaX) > 0.25f) deltaX else 0f
+        iconsContainer.translationY = if (abs(deltaY) > 0.25f) deltaY else 0f
         view.setTag(R.id.dock_center_signature, signature)
     }
 
@@ -932,7 +933,7 @@ class DockControlModule : XposedModule() {
         const val KEY_AUTO_HIDE_SECONDS = "auto_hide_seconds"
         const val KEY_DOCK_GRAVITY = "dock_gravity"
         const val KEY_LAYOUT_VERSION = "layout_version"
-        const val LAYOUT_VERSION = 7
+        const val LAYOUT_VERSION = 8
         const val GRAVITY_BOTTOM = "bottom"
         const val GRAVITY_TOP = "top"
         const val GRAVITY_LEFT = "left"
