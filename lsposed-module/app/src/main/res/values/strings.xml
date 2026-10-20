@@ -44,7 +44,7 @@
     <string name="right_margin_value">Отступ справа: %1$d dp</string>
     <string name="width_label">Ширина дока</string>
     <string name="width_value">Ширина дока: %1$d%%</string>
-    <string name="height_label">Высота дока (0 = авто)</string>
+    <string name="height_label">Высота дока (0 = системная)</string>
     <string name="height_value">Высота дока: %1$d dp</string>
     <string name="icon_offset_x">Смещение иконок влево/вправо</string>
     <string name="icon_offset_x_value">Смещение иконок X: %1$d dp</string>

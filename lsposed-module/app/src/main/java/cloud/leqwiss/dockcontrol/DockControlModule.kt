@@ -286,7 +286,7 @@ class DockControlModule : XposedModule() {
             }
 
             if (!style.forceBackground && state.background != null) {
-                applyGeometry(view, style)
+                applyGeometry(view, style, state)
                 applyAutoHide(view)
                 return
             }
@@ -297,11 +297,8 @@ class DockControlModule : XposedModule() {
                 view.background = createBackground(style, density)
                 view.setTag(R.id.dock_background_key, backgroundKey)
             }
-            if (view.layerType != View.LAYER_TYPE_NONE) {
-                view.setLayerType(View.LAYER_TYPE_NONE, null)
-            }
             if (style.hideSearch) hideQsb(view) else showQsb(view)
-            applyGeometry(view, style)
+            applyGeometry(view, style, state)
             applyAutoHide(view)
         } catch (throwable: Throwable) {
             log(Log.WARN, TAG, "Applying dock style failed", throwable)
@@ -371,7 +368,7 @@ class DockControlModule : XposedModule() {
         return "${style.glassStyle}|${style.backgroundColor}|${style.cornerRadiusDp}|$density"
     }
 
-    private fun applyGeometry(view: View, style: DockStyle) {
+    private fun applyGeometry(view: View, style: DockStyle, state: OriginalState) {
         val layoutParams = view.layoutParams ?: return
         val density = view.resources.displayMetrics.density
         val parentView = view.parent as? View
@@ -415,26 +412,14 @@ class DockControlModule : XposedModule() {
             layoutChanged = true
         }
 
-        if (forceFullScreen) {
-            val desiredHeight = if (style.heightDp > 0) {
-                (style.heightDp * density).toInt()
-            } else {
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            }
-            if (layoutParams.height != desiredHeight) {
-                layoutParams.height = desiredHeight
-                layoutChanged = true
-            }
-        } else if (style.adaptive) {
-            val desiredHeight = if (style.heightDp > 0) {
-                (style.heightDp * density).toInt()
-            } else {
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            }
-            if (layoutParams.height != desiredHeight) {
-                layoutParams.height = desiredHeight
-                layoutChanged = true
-            }
+        val desiredHeight = if (style.heightDp > 0) {
+            (style.heightDp * density).toInt()
+        } else {
+            state.height
+        }
+        if (layoutParams.height != desiredHeight) {
+            layoutParams.height = desiredHeight
+            layoutChanged = true
         }
 
         if (layoutParams is FrameLayout.LayoutParams) {
@@ -456,7 +441,11 @@ class DockControlModule : XposedModule() {
         val offsetX = currentStyle.iconOffsetXDp * view.resources.displayMetrics.density
         val offsetY = currentStyle.iconOffsetYDp * view.resources.displayMetrics.density
         val iconsContainer = findIconsContainer(view) ?: return
-        val contentBounds = contentBounds(iconsContainer) ?: return
+        val contentBounds = contentBounds(
+            iconsContainer,
+            iconsContainer.translationX,
+            iconsContainer.translationY
+        ) ?: return
         val currentCenterX = contentBounds.centerX
         val currentCenterY = contentBounds.centerY
         val targetCenterX = view.width / 2f + offsetX
@@ -505,6 +494,7 @@ class DockControlModule : XposedModule() {
         for (index in 0 until parent.childCount) {
             val child = parent.getChildAt(index)
             if (child.visibility != View.VISIBLE) continue
+            if (!isContentChild(child)) continue
             val childOffsetX = offsetX + child.left + child.translationX
             val childOffsetY = offsetY + child.top + child.translationY
             if (child is ViewGroup) {
@@ -533,6 +523,13 @@ class DockControlModule : XposedModule() {
             }
         }
         return bounds
+    }
+
+    private fun isContentChild(child: View): Boolean {
+        val name = child.javaClass.name
+        return !(name.contains("Qsb", true) ||
+            name.contains("Search", true) ||
+            name.contains("Smartspace", true))
     }
 
     private fun hideQsb(view: View) {
@@ -722,8 +719,8 @@ class DockControlModule : XposedModule() {
         val paddingBottom: Int = view.paddingBottom
         val layerType: Int = view.layerType
         val translationY: Float = view.translationY
-        private val width: Int = view.layoutParams.width
-        private val height: Int = view.layoutParams.height
+        val width: Int = view.layoutParams.width
+        val height: Int = view.layoutParams.height
         private val leftMargin: Int
         private val topMargin: Int
         private val rightMargin: Int
