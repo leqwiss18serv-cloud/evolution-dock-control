@@ -845,6 +845,8 @@ class DockControlModule : XposedModule() {
         val centerY: Float
             get() = (top + bottom) / 2f
 
+        fun width(): Float = right - left
+
         fun union(left: Float, top: Float, right: Float, bottom: Float) {
             this.left = minOf(this.left, left)
             this.top = minOf(this.top, top)
