@@ -276,8 +276,15 @@ class DockControlModule : XposedModule() {
                 return
             }
 
-            view.setLayerType(View.LAYER_TYPE_HARDWARE, null)
             view.background = createBackground(style, view.resources.displayMetrics.density)
+            view.setLayerType(
+                if (style.realBlur && style.glassStyle == STYLE_LIQUID) {
+                    View.LAYER_TYPE_HARDWARE
+                } else {
+                    View.LAYER_TYPE_NONE
+                },
+                null
+            )
             applyRenderEffect(view, style)
             if (style.hideSearch) hideQsb(view) else showQsb(view)
             applyGeometry(view, style)
@@ -289,21 +296,50 @@ class DockControlModule : XposedModule() {
 
     private fun createBackground(style: DockStyle, density: Float): Drawable {
         val cornerRadius = style.cornerRadiusDp * density
-        val base = GradientDrawable().apply {
-            setColor(style.backgroundColor)
-            setCornerRadius(cornerRadius)
+        if (style.glassStyle == STYLE_SOLID) {
+            return GradientDrawable().apply {
+                setColor(style.backgroundColor)
+                setCornerRadius(cornerRadius)
+            }
         }
-        if (style.glassStyle == STYLE_SOLID) return base
 
-        val highlightTop = if (style.glassStyle == STYLE_LIQUID) 0x36FFFFFF else 0x22FFFFFF
-        val highlight = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(highlightTop, 0x02FFFFFF)
-        ).apply { setCornerRadius(cornerRadius) }
+        val sourceAlpha = Color.alpha(style.backgroundColor)
+        val base = if (style.glassStyle == STYLE_LIQUID) {
+            GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    scaleAlpha(style.backgroundColor, 0.62f),
+                    scaleAlpha(style.backgroundColor, 0.86f)
+                )
+            ).apply { setCornerRadius(cornerRadius) }
+        } else {
+            GradientDrawable().apply {
+                setColor(style.backgroundColor)
+                setCornerRadius(cornerRadius)
+            }
+        }
+
+        val highlight = if (style.glassStyle == STYLE_LIQUID) {
+            GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0x59FFFFFF, 0x00FFFFFF, 0x21FFFFFF)
+            ).apply { setCornerRadius(cornerRadius) }
+        } else {
+            GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0x14FFFFFF, 0x08FFFFFF)
+            ).apply { setCornerRadius(cornerRadius) }
+        }
+
+        val borderAlpha = if (style.glassStyle == STYLE_LIQUID) 0x5CFFFFFF else 0x26FFFFFF
         val border = GradientDrawable().apply {
             setColor(Color.TRANSPARENT)
             setCornerRadius(cornerRadius)
-            setStroke((density * 1.1f).toInt().coerceAtLeast(1), 0x33FFFFFF)
+            setStroke(
+                (density * if (style.glassStyle == STYLE_LIQUID) 1.25f else 0.9f).toInt()
+                    .coerceAtLeast(1),
+                borderAlpha
+            )
         }
         return LayerDrawable(arrayOf(base, highlight, border))
     }
@@ -334,6 +370,15 @@ class DockControlModule : XposedModule() {
         }
     }
 
+    private fun scaleAlpha(color: Int, factor: Float): Int {
+        return Color.argb(
+            (Color.alpha(color) * factor).toInt().coerceIn(0, 255),
+            Color.red(color),
+            Color.green(color),
+            Color.blue(color)
+        )
+    }
+
     private fun applyGeometry(view: View, style: DockStyle) {
         val layoutParams = view.layoutParams ?: return
         val density = view.resources.displayMetrics.density
@@ -347,15 +392,24 @@ class DockControlModule : XposedModule() {
             layoutParams.bottomMargin = (style.bottomMarginDp * density).toInt()
         }
 
-        if (style.adaptive) {
-            if (parentWidth > 0) {
-                layoutParams.width = (parentWidth * style.widthPercent / 100).coerceAtLeast(1)
-            }
+        val forceFullScreen = style.widthPercent >= 100
+        if (forceFullScreen) {
+            layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
+        } else if (style.adaptive && parentWidth > 0) {
+            layoutParams.width = (parentWidth * style.widthPercent / 100).coerceAtLeast(1)
+        }
+
+        if (style.adaptive || forceFullScreen) {
             layoutParams.height = if (style.heightDp > 0) {
                 (style.heightDp * density).toInt()
             } else {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             }
+        }
+
+        if (forceFullScreen && layoutParams is ViewGroup.MarginLayoutParams) {
+            layoutParams.leftMargin = 0
+            layoutParams.rightMargin = 0
         }
 
         if (layoutParams is FrameLayout.LayoutParams) {

@@ -3,8 +3,10 @@ package cloud.leqwiss.dockcontrol
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -27,6 +29,7 @@ class DockPreviewView @JvmOverloads constructor(
     var cornerRadiusDp: Float = DEFAULT_CORNER_RADIUS.toFloat()
     var dockColor: Int = Color.argb((255 * DEFAULT_OPACITY) / 100, 28, 28, 30)
     var dockGravity: String = GRAVITY_BOTTOM
+    var glassStyle: String = GLASS_STYLE_LIQUID
 
     var onDockChanged: ((left: Int, right: Int, top: Int, bottom: Int, height: Int) -> Unit)? = null
 
@@ -34,6 +37,9 @@ class DockPreviewView @JvmOverloads constructor(
         color = 0xFF101014L.toInt()
     }
     private val dockPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFF2F2F7.toInt()
     }
@@ -59,8 +65,58 @@ class DockPreviewView @JvmOverloads constructor(
         )
 
         computeDockRect()
-        dockPaint.color = dockColor
-        canvas.drawRoundRect(dockRect, cornerRadiusDp.dpToPx(), cornerRadiusDp.dpToPx(), dockPaint)
+        val corner = cornerRadiusDp.dpToPx()
+        when (glassStyle) {
+            GLASS_STYLE_SOLID -> {
+                dockPaint.shader = null
+                dockPaint.color = dockColor
+                canvas.drawRoundRect(dockRect, corner, corner, dockPaint)
+            }
+
+            GLASS_STYLE_MATTE -> {
+                dockPaint.shader = LinearGradient(
+                    dockRect.left,
+                    dockRect.top,
+                    dockRect.left,
+                    dockRect.bottom,
+                    intArrayOf(scaleAlpha(dockColor, 1f), scaleAlpha(dockColor, 0.94f)),
+                    floatArrayOf(0f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawRoundRect(dockRect, corner, corner, dockPaint)
+            }
+
+            else -> {
+                dockPaint.shader = LinearGradient(
+                    dockRect.left,
+                    dockRect.top,
+                    dockRect.right,
+                    dockRect.bottom,
+                    intArrayOf(scaleAlpha(dockColor, 0.62f), scaleAlpha(dockColor, 0.86f)),
+                    floatArrayOf(0f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawRoundRect(dockRect, corner, corner, dockPaint)
+                dockPaint.shader = LinearGradient(
+                    dockRect.left,
+                    dockRect.top,
+                    dockRect.right,
+                    dockRect.bottom,
+                    intArrayOf(0x59FFFFFF, 0x00FFFFFF, 0x21FFFFFF),
+                    floatArrayOf(0f, 0.58f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawRoundRect(dockRect, corner, corner, dockPaint)
+            }
+        }
+
+        borderPaint.strokeWidth = if (glassStyle == GLASS_STYLE_LIQUID) {
+            1.25f.dpToPx()
+        } else {
+            0.9f.dpToPx()
+        }
+        borderPaint.color = if (glassStyle == GLASS_STYLE_LIQUID) 0x5CFFFFFF else 0x26FFFFFF
+        canvas.drawRoundRect(dockRect, corner, corner, borderPaint)
 
         val iconRadius = 13f.dpToPx()
         val iconCount = 4
@@ -209,6 +265,15 @@ class DockPreviewView @JvmOverloads constructor(
 
     private fun Float.dpToPx(): Float = this * resources.displayMetrics.density
 
+    private fun scaleAlpha(color: Int, factor: Float): Int {
+        return Color.argb(
+            (Color.alpha(color) * factor).toInt().coerceIn(0, 255),
+            Color.red(color),
+            Color.green(color),
+            Color.blue(color)
+        )
+    }
+
     private enum class TouchMode {
         NONE,
         MOVE,
@@ -221,6 +286,9 @@ class DockPreviewView @JvmOverloads constructor(
     companion object {
         const val GRAVITY_BOTTOM = "bottom"
         const val GRAVITY_TOP = "top"
+        const val GLASS_STYLE_LIQUID = "liquid"
+        const val GLASS_STYLE_MATTE = "matte"
+        const val GLASS_STYLE_SOLID = "solid"
         const val DEFAULT_WIDTH_PERCENT = 78f
         const val DEFAULT_HEIGHT_DP = 0
         const val DEFAULT_CORNER_RADIUS = 34f

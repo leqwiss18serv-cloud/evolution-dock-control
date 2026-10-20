@@ -316,6 +316,7 @@ class SettingsActivity : AppCompatActivity() {
                 .putString(KEY_GLASS_STYLE, style)
                 .apply()
             currentGlassStyle = style
+            updatePreview()
         }.onFailure {
             statusView.text = getString(R.string.settings_save_failed)
         }
@@ -478,7 +479,8 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateLabels(position: String = GRAVITY_BOTTOM) {
+    private fun updateLabels(position: String = currentPreviewPosition) {
+        val labelPosition = position
         opacityLabel.text = getString(R.string.background_opacity_value, opacitySlider.value.toInt())
         radiusLabel.text = getString(R.string.corner_radius_value, radiusSlider.value.toInt())
         topLabel.text = getString(R.string.top_margin_value, topSlider.value.toInt())
@@ -494,7 +496,7 @@ class SettingsActivity : AppCompatActivity() {
         positionLabel.text = getString(
             R.string.position_value,
             getString(
-                when (position) {
+            when (labelPosition) {
                     GRAVITY_TOP -> R.string.position_top
                     GRAVITY_LEFT -> R.string.position_left
                     GRAVITY_RIGHT -> R.string.position_right
@@ -506,14 +508,16 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun updatePreview(position: String = currentPreviewPosition) {
         currentPreviewPosition = position
-        dockPreview.widthPercent = widthSlider.value
+        val widthPercent = widthSlider.value
+        dockPreview.widthPercent = widthPercent
         dockPreview.heightDp = heightSlider.value.toInt()
-        dockPreview.leftMarginDp = leftSlider.value
-        dockPreview.rightMarginDp = rightSlider.value
+        dockPreview.leftMarginDp = if (widthPercent >= 100f) 0f else leftSlider.value
+        dockPreview.rightMarginDp = if (widthPercent >= 100f) 0f else rightSlider.value
         dockPreview.topMarginDp = topSlider.value
         dockPreview.bottomMarginDp = bottomSlider.value
         dockPreview.cornerRadiusDp = radiusSlider.value
         dockPreview.dockGravity = position
+        dockPreview.glassStyle = currentGlassStyle
         dockPreview.dockColor = try {
             val base = Color.parseColor(colorInput.text.toString().trim().ifEmpty { DEFAULT_COLOR })
             Color.argb(
