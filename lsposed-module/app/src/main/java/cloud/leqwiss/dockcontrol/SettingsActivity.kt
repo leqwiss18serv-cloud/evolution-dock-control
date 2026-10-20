@@ -25,7 +25,6 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var safeModeSwitch: MaterialSwitch
     private lateinit var forceBackgroundSwitch: MaterialSwitch
     private lateinit var hideSearchSwitch: MaterialSwitch
-    private lateinit var realBlurSwitch: MaterialSwitch
     private lateinit var colorInput: EditText
     private lateinit var opacitySlider: Slider
     private lateinit var radiusSlider: Slider
@@ -38,7 +37,6 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var iconOffsetXSlider: Slider
     private lateinit var iconOffsetYSlider: Slider
     private lateinit var autoHideSlider: Slider
-    private lateinit var blurSlider: Slider
     private lateinit var opacityLabel: TextView
     private lateinit var radiusLabel: TextView
     private lateinit var topLabel: TextView
@@ -50,7 +48,6 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var iconOffsetXLabel: TextView
     private lateinit var iconOffsetYLabel: TextView
     private lateinit var autoHideLabel: TextView
-    private lateinit var blurLabel: TextView
     private lateinit var restartButton: MaterialButton
     private lateinit var dockPreview: DockPreviewView
     private var liveEditing = true
@@ -91,7 +88,6 @@ class SettingsActivity : AppCompatActivity() {
         safeModeSwitch = findViewById(R.id.safeModeSwitch)
         forceBackgroundSwitch = findViewById(R.id.forceBackgroundSwitch)
         hideSearchSwitch = findViewById(R.id.hideSearchSwitch)
-        realBlurSwitch = findViewById(R.id.realBlurSwitch)
         colorInput = findViewById(R.id.colorInput)
         opacitySlider = findViewById(R.id.opacitySlider)
         radiusSlider = findViewById(R.id.radiusSlider)
@@ -104,7 +100,6 @@ class SettingsActivity : AppCompatActivity() {
         iconOffsetXSlider = findViewById(R.id.iconOffsetXSlider)
         iconOffsetYSlider = findViewById(R.id.iconOffsetYSlider)
         autoHideSlider = findViewById(R.id.autoHideSlider)
-        blurSlider = findViewById(R.id.blurSlider)
         opacityLabel = findViewById(R.id.opacityLabel)
         radiusLabel = findViewById(R.id.radiusLabel)
         topLabel = findViewById(R.id.topLabel)
@@ -116,7 +111,6 @@ class SettingsActivity : AppCompatActivity() {
         iconOffsetXLabel = findViewById(R.id.iconOffsetXLabel)
         iconOffsetYLabel = findViewById(R.id.iconOffsetYLabel)
         autoHideLabel = findViewById(R.id.autoHideLabel)
-        blurLabel = findViewById(R.id.blurLabel)
         restartButton = findViewById(R.id.restartButton)
         dockPreview = findViewById(R.id.dockPreview)
     }
@@ -127,9 +121,8 @@ class SettingsActivity : AppCompatActivity() {
         safeModeSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
         forceBackgroundSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
         hideSearchSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
-        realBlurSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
 
-        listOf(opacitySlider, radiusSlider, topSlider, bottomSlider, leftSlider, rightSlider, widthSlider, heightSlider, iconOffsetXSlider, iconOffsetYSlider, autoHideSlider, blurSlider)
+        listOf(opacitySlider, radiusSlider, topSlider, bottomSlider, leftSlider, rightSlider, widthSlider, heightSlider, iconOffsetXSlider, iconOffsetYSlider, autoHideSlider)
             .forEach { slider ->
                 slider.addOnChangeListener { _, _, _ -> updateLabels() }
                 slider.addOnChangeListener { _, _, _ -> updatePreview() }
@@ -222,7 +215,6 @@ class SettingsActivity : AppCompatActivity() {
             safeModeSwitch.isChecked = prefs.readBoolean(KEY_SAFE_MODE, true)
             forceBackgroundSwitch.isChecked = prefs.readBoolean(KEY_FORCE_BACKGROUND, true)
             hideSearchSwitch.isChecked = prefs.readBoolean(KEY_HIDE_SEARCH, false)
-            realBlurSwitch.isChecked = prefs.readBoolean(KEY_REAL_BLUR, false)
             colorInput.setText(prefs.getString(KEY_BACKGROUND_COLOR, DEFAULT_COLOR) ?: DEFAULT_COLOR)
             val layoutVersion = prefs.readInt(KEY_LAYOUT_VERSION, 0, 0, Int.MAX_VALUE)
             opacitySlider.value = prefs.readInt(KEY_BACKGROUND_OPACITY, DEFAULT_OPACITY, 0, 100).toFloat()
@@ -236,16 +228,20 @@ class SettingsActivity : AppCompatActivity() {
             iconOffsetXSlider.value = prefs.readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             iconOffsetYSlider.value = prefs.readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             autoHideSlider.value = prefs.readInt(KEY_AUTO_HIDE_SECONDS, 0, 0, 60).toFloat()
-            blurSlider.value = prefs.readInt(KEY_BLUR_RADIUS, DEFAULT_BLUR_RADIUS, 0, 50).toFloat()
-            if (layoutVersion < 4) {
+            if (layoutVersion < 5) {
                 radiusSlider.value = 34f
                 bottomSlider.value = 16f
-                widthSlider.value = 78f
+                widthSlider.value = 100f
+                leftSlider.value = 0f
+                rightSlider.value = 0f
                 prefs.edit()
                     .putInt(KEY_CORNER_RADIUS, 34)
                     .putInt(KEY_BOTTOM_MARGIN, 16)
-                    .putInt(KEY_WIDTH_PERCENT, 78)
-                    .putInt(KEY_LAYOUT_VERSION, 4)
+                    .putInt(KEY_WIDTH_PERCENT, 100)
+                    .putInt(KEY_LEFT_MARGIN, 0)
+                    .putInt(KEY_RIGHT_MARGIN, 0)
+                    .putBoolean(KEY_REAL_BLUR, false)
+                    .putInt(KEY_LAYOUT_VERSION, 5)
                     .apply()
             }
             updatingUi = false
@@ -274,7 +270,6 @@ class SettingsActivity : AppCompatActivity() {
             editor.putBoolean(KEY_SAFE_MODE, safeModeSwitch.isChecked)
             editor.putBoolean(KEY_FORCE_BACKGROUND, forceBackgroundSwitch.isChecked)
             editor.putBoolean(KEY_HIDE_SEARCH, hideSearchSwitch.isChecked)
-            editor.putBoolean(KEY_REAL_BLUR, realBlurSwitch.isChecked)
             editor.putString(KEY_BACKGROUND_COLOR, colorInput.text.toString().trim())
             editor.putInt(KEY_BACKGROUND_OPACITY, opacitySlider.value.toInt())
             editor.putInt(KEY_CORNER_RADIUS, radiusSlider.value.toInt())
@@ -287,7 +282,6 @@ class SettingsActivity : AppCompatActivity() {
             editor.putInt(KEY_ICON_OFFSET_X, iconOffsetXSlider.value.toInt())
             editor.putInt(KEY_ICON_OFFSET_Y, iconOffsetYSlider.value.toInt())
             editor.putInt(KEY_AUTO_HIDE_SECONDS, autoHideSlider.value.toInt())
-            editor.putInt(KEY_BLUR_RADIUS, blurSlider.value.toInt())
             editor.apply()
             updatePreview()
             statusView.text = getString(R.string.settings_saved)
@@ -367,7 +361,6 @@ class SettingsActivity : AppCompatActivity() {
             .put(KEY_ADAPTIVE, adaptiveSwitch.isChecked)
             .put(KEY_FORCE_BACKGROUND, forceBackgroundSwitch.isChecked)
             .put(KEY_HIDE_SEARCH, hideSearchSwitch.isChecked)
-            .put(KEY_REAL_BLUR, realBlurSwitch.isChecked)
             .put(KEY_BACKGROUND_COLOR, colorInput.text.toString().trim())
             .put(KEY_BACKGROUND_OPACITY, opacitySlider.value.toInt())
             .put(KEY_CORNER_RADIUS, radiusSlider.value.toInt())
@@ -380,7 +373,6 @@ class SettingsActivity : AppCompatActivity() {
             .put(KEY_ICON_OFFSET_X, iconOffsetXSlider.value.toInt())
             .put(KEY_ICON_OFFSET_Y, iconOffsetYSlider.value.toInt())
             .put(KEY_GLASS_STYLE, currentGlassStyle)
-            .put(KEY_BLUR_RADIUS, blurSlider.value.toInt())
             .put(KEY_AUTO_HIDE_SECONDS, autoHideSlider.value.toInt())
             .put(KEY_DOCK_GRAVITY, currentPreviewPosition)
     }
@@ -392,7 +384,6 @@ class SettingsActivity : AppCompatActivity() {
         adaptiveSwitch.isChecked = config.optBoolean(KEY_ADAPTIVE, true)
         forceBackgroundSwitch.isChecked = config.optBoolean(KEY_FORCE_BACKGROUND, true)
         hideSearchSwitch.isChecked = config.optBoolean(KEY_HIDE_SEARCH, false)
-        realBlurSwitch.isChecked = config.optBoolean(KEY_REAL_BLUR, false)
         colorInput.setText(config.optString(KEY_BACKGROUND_COLOR, DEFAULT_COLOR))
         opacitySlider.value = config.optInt(KEY_BACKGROUND_OPACITY, DEFAULT_OPACITY).coerceIn(0, 100).toFloat()
         radiusSlider.value = config.optInt(KEY_CORNER_RADIUS, DEFAULT_CORNER_RADIUS).coerceIn(0, 50).toFloat()
@@ -405,7 +396,6 @@ class SettingsActivity : AppCompatActivity() {
         iconOffsetXSlider.value = config.optInt(KEY_ICON_OFFSET_X, 0).coerceIn(-50, 50).toFloat()
         iconOffsetYSlider.value = config.optInt(KEY_ICON_OFFSET_Y, 0).coerceIn(-50, 50).toFloat()
         autoHideSlider.value = config.optInt(KEY_AUTO_HIDE_SECONDS, 0).coerceIn(0, 60).toFloat()
-        blurSlider.value = config.optInt(KEY_BLUR_RADIUS, DEFAULT_BLUR_RADIUS).coerceIn(0, 50).toFloat()
         currentGlassStyle = config.optString(KEY_GLASS_STYLE, STYLE_LIQUID)
         val position = config.optString(KEY_DOCK_GRAVITY, GRAVITY_BOTTOM)
         updatingUi = false
@@ -492,7 +482,6 @@ class SettingsActivity : AppCompatActivity() {
         iconOffsetXLabel.text = getString(R.string.icon_offset_x_value, iconOffsetXSlider.value.toInt())
         iconOffsetYLabel.text = getString(R.string.icon_offset_y_value, iconOffsetYSlider.value.toInt())
         autoHideLabel.text = getString(R.string.auto_hide, autoHideSlider.value.toInt())
-        blurLabel.text = getString(R.string.blur_radius, blurSlider.value.toInt())
         positionLabel.text = getString(
             R.string.position_value,
             getString(

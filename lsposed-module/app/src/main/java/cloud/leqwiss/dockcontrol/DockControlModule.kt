@@ -3,12 +3,9 @@ package cloud.leqwiss.dockcontrol
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Rect
-import android.graphics.RenderEffect
-import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -43,6 +40,7 @@ class DockControlModule : XposedModule() {
 
         if (loadedPreferences != null) {
             preferences = loadedPreferences
+            migratePreferences(loadedPreferences)
             currentStyle = loadedPreferences.readStyle()
             registerPreferenceListener(loadedPreferences)
         } else {
@@ -78,6 +76,22 @@ class DockControlModule : XposedModule() {
             newPreferences.registerOnSharedPreferenceChangeListener { _, _ -> updateStyle() }
         }.onFailure {
             log(Log.WARN, TAG, "Preference listener registration failed", it)
+        }
+    }
+
+    private fun migratePreferences(preferences: SharedPreferences) {
+        runCatching {
+            val layoutVersion = preferences.getInt(KEY_LAYOUT_VERSION, 0)
+            if (layoutVersion >= LAYOUT_VERSION) return
+            preferences.edit()
+                .putInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT)
+                .putInt(KEY_LEFT_MARGIN, 0)
+                .putInt(KEY_RIGHT_MARGIN, 0)
+                .putBoolean(KEY_REAL_BLUR, false)
+                .putInt(KEY_LAYOUT_VERSION, LAYOUT_VERSION)
+                .apply()
+        }.onFailure {
+            log(Log.WARN, TAG, "Preference migration failed", it)
         }
     }
 
@@ -277,15 +291,7 @@ class DockControlModule : XposedModule() {
             }
 
             view.background = createBackground(style, view.resources.displayMetrics.density)
-            view.setLayerType(
-                if (style.realBlur && style.glassStyle == STYLE_LIQUID) {
-                    View.LAYER_TYPE_HARDWARE
-                } else {
-                    View.LAYER_TYPE_NONE
-                },
-                null
-            )
-            applyRenderEffect(view, style)
+            view.setLayerType(View.LAYER_TYPE_NONE, null)
             if (style.hideSearch) hideQsb(view) else showQsb(view)
             applyGeometry(view, style)
             applyAutoHide(view)
@@ -344,32 +350,6 @@ class DockControlModule : XposedModule() {
         return LayerDrawable(arrayOf(base, highlight, border))
     }
 
-    private fun applyRenderEffect(view: View, style: DockStyle) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                style.glassStyle == STYLE_LIQUID &&
-                style.realBlur &&
-                style.blurRadius > 0
-            ) {
-                val radius = style.blurRadius.toFloat()
-                view.setRenderEffect(
-                    RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
-                )
-            } else {
-                setNoRenderEffect(view)
-            }
-        } catch (throwable: Throwable) {
-            log(Log.WARN, TAG, "RenderEffect unavailable; using matte glass fallback", throwable)
-            runCatching { setNoRenderEffect(view) }
-        }
-    }
-
-    private fun setNoRenderEffect(view: View) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            view.setRenderEffect(null)
-        }
-    }
-
     private fun scaleAlpha(color: Int, factor: Float): Int {
         return Color.argb(
             (Color.alpha(color) * factor).toInt().coerceIn(0, 255),
@@ -424,16 +404,49 @@ class DockControlModule : XposedModule() {
         if (view !is ViewGroup) return
         val offsetX = currentStyle.iconOffsetXDp * view.resources.displayMetrics.density
         val offsetY = currentStyle.iconOffsetYDp * view.resources.displayMetrics.density
+        val contentBounds = contentBounds(view) ?: return
+        val currentCenterX = contentBounds.centerX()
+        val currentCenterY = contentBounds.centerY()
+        val targetCenterX = view.width / 2f + offsetX
+        val targetCenterY = view.height / 2f + offsetY
         for (index in 0 until view.childCount) {
             val child = view.getChildAt(index)
-            val childLayoutParams = child.layoutParams
-            if (childLayoutParams is FrameLayout.LayoutParams) {
-                childLayoutParams.gravity = Gravity.CENTER
-                child.layoutParams = childLayoutParams
-            }
-            child.translationX = offsetX
-            child.translationY = offsetY
+            child.translationX += targetCenterX - currentCenterX
+            child.translationY += targetCenterY - currentCenterY
         }
+    }
+
+    private fun contentBounds(parent: ViewGroup, offsetX: Int = 0, offsetY: Int = 0): Rect? {
+        var bounds: Rect? = null
+        for (index in 0 until parent.childCount) {
+            val child = parent.getChildAt(index)
+            if (child.visibility == View.GONE) continue
+            val childOffsetX = offsetX + child.left + child.translationX.toInt()
+            val childOffsetY = offsetY + child.top + child.translationY.toInt()
+            if (child is ViewGroup) {
+                contentBounds(child, childOffsetX, childOffsetY)?.let { childBounds ->
+                    if (bounds == null) {
+                        bounds = childBounds
+                    } else {
+                        bounds?.union(childBounds)
+                    }
+                }
+            } else {
+                val childBounds = Rect(
+                    childOffsetX,
+                    childOffsetY,
+                    childOffsetX + child.width,
+                    childOffsetY + child.height
+                )
+                if (childBounds.isEmpty) continue
+                if (bounds == null) {
+                    bounds = childBounds
+                } else {
+                    bounds?.union(childBounds)
+                }
+            }
+        }
+        return bounds
     }
 
     private fun hideQsb(view: View) {
@@ -521,7 +534,6 @@ class DockControlModule : XposedModule() {
         val state = view.getTag(R.id.dock_state) as? OriginalState ?: return
         view.background = state.background
         view.setLayerType(state.layerType, null)
-        setNoRenderEffect(view)
         view.setPadding(state.paddingLeft, state.paddingTop, state.paddingRight, state.paddingBottom)
         view.translationY = state.translationY
         view.alpha = 1f
@@ -548,7 +560,7 @@ class DockControlModule : XposedModule() {
                 adaptive = readBoolean(KEY_ADAPTIVE, true),
                 forceBackground = readBoolean(KEY_FORCE_BACKGROUND, true),
                 hideSearch = readBoolean(KEY_HIDE_SEARCH, false),
-                realBlur = readBoolean(KEY_REAL_BLUR, false),
+                realBlur = false,
                 backgroundColor = readColor(),
                 backgroundOpacity = readInt(KEY_BACKGROUND_OPACITY, DEFAULT_OPACITY, 0, 100),
                 cornerRadiusDp = readInt(KEY_CORNER_RADIUS, DEFAULT_CORNER_RADIUS, 0, 50),
@@ -630,6 +642,9 @@ class DockControlModule : XposedModule() {
         private val rightMargin: Int
         private val bottomMargin: Int
         private val gravity: Int
+        private val childCount: Int
+        private val childTranslationX: FloatArray
+        private val childTranslationY: FloatArray
 
         init {
             val layoutParams = view.layoutParams
@@ -645,6 +660,13 @@ class DockControlModule : XposedModule() {
                 bottomMargin = 0
             }
             gravity = (layoutParams as? FrameLayout.LayoutParams)?.gravity ?: Gravity.NO_GRAVITY
+            childCount = (view as? ViewGroup)?.childCount ?: 0
+            childTranslationX = FloatArray(childCount) { index ->
+                (view as ViewGroup).getChildAt(index).translationX
+            }
+            childTranslationY = FloatArray(childCount) { index ->
+                (view as ViewGroup).getChildAt(index).translationY
+            }
         }
 
         fun restoreLayoutParams(view: View) {
@@ -661,6 +683,12 @@ class DockControlModule : XposedModule() {
                 layoutParams.gravity = gravity
             }
             view.layoutParams = layoutParams
+            if (view is ViewGroup) {
+                for (index in 0 until childCount) {
+                    view.getChildAt(index).translationX = childTranslationX[index]
+                    view.getChildAt(index).translationY = childTranslationY[index]
+                }
+            }
         }
     }
 
@@ -702,7 +730,7 @@ class DockControlModule : XposedModule() {
                 bottomMarginDp = 16,
                 leftMarginDp = 14,
                 rightMarginDp = 14,
-                widthPercent = 78,
+                widthPercent = 100,
                 heightDp = 0,
                 iconOffsetXDp = 0,
                 iconOffsetYDp = 0,
@@ -738,6 +766,8 @@ class DockControlModule : XposedModule() {
         const val KEY_BLUR_RADIUS = "blur_radius"
         const val KEY_AUTO_HIDE_SECONDS = "auto_hide_seconds"
         const val KEY_DOCK_GRAVITY = "dock_gravity"
+        const val KEY_LAYOUT_VERSION = "layout_version"
+        const val LAYOUT_VERSION = 5
         const val GRAVITY_BOTTOM = "bottom"
         const val GRAVITY_TOP = "top"
         const val GRAVITY_LEFT = "left"
@@ -751,7 +781,7 @@ class DockControlModule : XposedModule() {
         const val DEFAULT_TOP_MARGIN = 0
         const val DEFAULT_BOTTOM_MARGIN = 16
         const val DEFAULT_HORIZONTAL_MARGIN = 14
-        const val DEFAULT_WIDTH_PERCENT = 78
+        const val DEFAULT_WIDTH_PERCENT = 100
         const val DEFAULT_HEIGHT_DP = 0
         const val DEFAULT_ICON_OFFSET = 0
         const val DEFAULT_BLUR_RADIUS = 18
