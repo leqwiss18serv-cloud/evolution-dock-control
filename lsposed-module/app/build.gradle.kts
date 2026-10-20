@@ -10,8 +10,8 @@ android {
         applicationId = "cloud.leqwiss.dockcontrol"
         minSdk = 29
         targetSdk = 36
-        versionCode = 13
-        versionName = "3.0.6"
+        versionCode = 14
+        versionName = "3.1.0"
     }
 
     buildTypes {

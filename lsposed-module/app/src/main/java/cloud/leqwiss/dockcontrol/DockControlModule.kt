@@ -2,10 +2,9 @@ package cloud.leqwiss.dockcontrol
 
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Rect
-import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -62,6 +61,9 @@ class DockControlModule : XposedModule() {
                 }
             }
             if (hooked) log(Log.INFO, TAG, "Hooked Hotseat: $className")
+            runCatching { hookDraw(hotseatClass) }.onFailure {
+                log(Log.WARN, TAG, "Draw hook failed for $className", it)
+            }
         }
 
         hookWorkspace(param.defaultClassLoader)
@@ -204,6 +206,30 @@ class DockControlModule : XposedModule() {
         return true
     }
 
+    private fun hookDraw(hotseatClass: Class<*>): Boolean {
+        val method = runCatching {
+            hotseatClass.getDeclaredMethod("dispatchDraw", Canvas::class.java)
+        }.getOrNull() ?: return false
+
+        hook(method)
+            .setPriority(XposedInterface.PRIORITY_HIGHEST)
+            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+            .intercept { chain ->
+                try {
+                    val view = chain.thisObject as? View ?: return@intercept chain.proceed()
+                    val canvas = chain.getArg(0) as? Canvas ?: return@intercept chain.proceed()
+                    if (currentStyle.enabled && currentStyle.forceBackground) {
+                        drawDockBackground(view, canvas)
+                    }
+                    chain.proceed()
+                } catch (throwable: Throwable) {
+                    log(Log.WARN, TAG, "Dock background draw failed", throwable)
+                    chain.proceed()
+                }
+            }
+        return true
+    }
+
     private fun hookConstructors(hotseatClass: Class<*>) {
         for (constructor in hotseatClass.declaredConstructors) {
             if (constructor.isSynthetic) continue
@@ -287,77 +313,20 @@ class DockControlModule : XposedModule() {
                 view.setTag(R.id.dock_state, state)
             }
 
-            if (!style.forceBackground && state.background != null) {
-                applyGeometry(view, style, state)
-                applyAutoHide(view)
-                return
-            }
-
-            val density = view.resources.displayMetrics.density
-            val backgroundKey = backgroundKey(style, density)
-            if (view.getTag(R.id.dock_background_key) != backgroundKey || view.background == null) {
-                view.background = createBackground(style, density)
-                view.setTag(R.id.dock_background_key, backgroundKey)
+            if (view.background != null) {
+                view.background = null
             }
             if (view.layerType != View.LAYER_TYPE_NONE) {
                 view.setLayerType(View.LAYER_TYPE_NONE, null)
             }
             if (style.hideSearch) hideQsb(view) else showQsb(view)
-            applyGeometry(view, style, state)
+            if (!style.forceBackground) {
+                applyGeometry(view, style, state)
+            }
             applyAutoHide(view)
         } catch (throwable: Throwable) {
             log(Log.WARN, TAG, "Applying dock style failed", throwable)
         }
-    }
-
-    private fun createBackground(style: DockStyle, density: Float): Drawable {
-        val cornerRadius = style.cornerRadiusDp * density
-        if (style.glassStyle == STYLE_SOLID) {
-            return GradientDrawable().apply {
-                setColor(style.backgroundColor)
-                setCornerRadius(cornerRadius)
-            }
-        }
-
-        val sourceAlpha = Color.alpha(style.backgroundColor)
-        val base = if (style.glassStyle == STYLE_LIQUID) {
-            GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(
-                    scaleAlpha(style.backgroundColor, 0.62f),
-                    scaleAlpha(style.backgroundColor, 0.86f)
-                )
-            ).apply { setCornerRadius(cornerRadius) }
-        } else {
-            GradientDrawable().apply {
-                setColor(style.backgroundColor)
-                setCornerRadius(cornerRadius)
-            }
-        }
-
-        val highlight = if (style.glassStyle == STYLE_LIQUID) {
-            GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0x59FFFFFF, 0x00FFFFFF, 0x21FFFFFF)
-            ).apply { setCornerRadius(cornerRadius) }
-        } else {
-            GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0x14FFFFFF, 0x08FFFFFF)
-            ).apply { setCornerRadius(cornerRadius) }
-        }
-
-        val borderAlpha = if (style.glassStyle == STYLE_LIQUID) 0x5CFFFFFF else 0x26FFFFFF
-        val border = GradientDrawable().apply {
-            setColor(Color.TRANSPARENT)
-            setCornerRadius(cornerRadius)
-            setStroke(
-                (density * if (style.glassStyle == STYLE_LIQUID) 1.25f else 0.9f).toInt()
-                    .coerceAtLeast(1),
-                borderAlpha
-            )
-        }
-        return LayerDrawable(arrayOf(base, highlight, border))
     }
 
     private fun scaleAlpha(color: Int, factor: Float): Int {
@@ -369,8 +338,34 @@ class DockControlModule : XposedModule() {
         )
     }
 
-    private fun backgroundKey(style: DockStyle, density: Float): String {
-        return "${style.glassStyle}|${style.backgroundColor}|${style.cornerRadiusDp}|$density"
+    private fun drawDockBackground(view: View, canvas: Canvas) {
+        val iconsContainer = findIconsContainer(view) ?: return
+        val bounds = contentBounds(iconsContainer) ?: return
+        val density = view.resources.displayMetrics.density
+        val style = currentStyle
+        val horizontalPadding = style.leftMarginDp * density
+        val verticalPadding = style.bottomMarginDp * density
+        val desiredWidth = view.width * style.widthPercent / 100f
+        val contentWidth = bounds.width()
+        val rectWidth = maxOf(desiredWidth, contentWidth + horizontalPadding * 2f)
+        val centerX = view.width / 2f
+        val left = centerX - rectWidth / 2f
+        val right = centerX + rectWidth / 2f
+        val top = bounds.top - verticalPadding
+        val bottom = bounds.bottom + verticalPadding
+        val radius = style.cornerRadiusDp * density
+        val paint = dockPaint(view)
+        paint.shader = null
+        paint.color = style.backgroundColor
+        canvas.drawRoundRect(left, top, right, bottom, radius, radius, paint)
+    }
+
+    private fun dockPaint(view: View): Paint {
+        val existing = view.getTag(R.id.dock_paint) as? Paint
+        if (existing != null) return existing
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        view.setTag(R.id.dock_paint, paint)
+        return paint
     }
 
     private fun applyGeometry(view: View, style: DockStyle, state: OriginalState) {
@@ -668,7 +663,6 @@ class DockControlModule : XposedModule() {
         cancelAutoHide(view)
         val state = view.getTag(R.id.dock_state) as? OriginalState ?: return
         view.background = state.background
-        view.setTag(R.id.dock_background_key, null)
         view.setTag(R.id.dock_center_signature, null)
         view.setLayerType(state.layerType, null)
         view.setPadding(state.paddingLeft, state.paddingTop, state.paddingRight, state.paddingBottom)
