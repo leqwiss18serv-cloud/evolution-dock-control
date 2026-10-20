@@ -513,7 +513,12 @@ class DockControlModule : XposedModule() {
                     if (currentBounds == null) {
                         bounds = childBounds
                     } else {
-                        currentBounds.union(childBounds)
+                        currentBounds.union(
+                            childBounds.left,
+                            childBounds.top,
+                            childBounds.right,
+                            childBounds.bottom
+                        )
                     }
                 }
             } else {
