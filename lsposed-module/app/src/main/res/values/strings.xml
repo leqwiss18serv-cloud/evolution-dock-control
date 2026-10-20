@@ -50,6 +50,17 @@
     <string name="icon_offset_x_value">Смещение иконок X: %1$d dp</string>
     <string name="icon_offset_y">Смещение иконок вверх/вниз</string>
     <string name="icon_offset_y_value">Смещение иконок Y: %1$d dp</string>
+    <string name="real_blur">Реальное размытие (может нагружать GPU)</string>
+    <string name="style_liquid">Liquid Glass</string>
+    <string name="style_matte">Матовое</string>
+    <string name="style_solid">Плотный</string>
+    <string name="auto_hide">Авто-скрытие: %1$d сек (0 = выкл.)</string>
+    <string name="blur_radius">Радиус размытия: %1$d</string>
+    <string name="export_config">Экспорт конфига</string>
+    <string name="import_config">Импорт конфига</string>
+    <string name="config_exported">Конфиг сохранён в Download</string>
+    <string name="config_imported">Конфиг импортирован</string>
+    <string name="config_error">Ошибка работы с конфигом</string>
     <string name="reset_settings">Сбросить настройки</string>
     <string name="service_unavailable">LSPosed не подключён. Установите APK, включите модуль и перезапустите лаунчер.</string>
     <string name="settings_ready">Настройки применяются автоматически после сохранения.</string>

@@ -3,6 +3,7 @@ package cloud.leqwiss.dockcontrol
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
+import android.provider.MediaStore
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -10,6 +11,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
 import io.github.libxposed.service.XposedService
+import org.json.JSONObject
+import android.net.Uri
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -22,6 +25,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var safeModeSwitch: MaterialSwitch
     private lateinit var forceBackgroundSwitch: MaterialSwitch
     private lateinit var hideSearchSwitch: MaterialSwitch
+    private lateinit var realBlurSwitch: MaterialSwitch
     private lateinit var colorInput: EditText
     private lateinit var opacitySlider: Slider
     private lateinit var radiusSlider: Slider
@@ -33,6 +37,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var heightSlider: Slider
     private lateinit var iconOffsetXSlider: Slider
     private lateinit var iconOffsetYSlider: Slider
+    private lateinit var autoHideSlider: Slider
+    private lateinit var blurSlider: Slider
     private lateinit var opacityLabel: TextView
     private lateinit var radiusLabel: TextView
     private lateinit var topLabel: TextView
@@ -43,10 +49,17 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var heightLabel: TextView
     private lateinit var iconOffsetXLabel: TextView
     private lateinit var iconOffsetYLabel: TextView
+    private lateinit var autoHideLabel: TextView
+    private lateinit var blurLabel: TextView
     private lateinit var restartButton: MaterialButton
     private lateinit var dockPreview: DockPreviewView
     private var liveEditing = true
     private var currentPreviewPosition = GRAVITY_BOTTOM
+    private var currentGlassStyle = STYLE_LIQUID
+
+    private val importConfigLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { importConfig(it) } }
 
     private val serviceListener: () -> Unit = {
         runOnUiThread {
@@ -78,6 +91,7 @@ class SettingsActivity : AppCompatActivity() {
         safeModeSwitch = findViewById(R.id.safeModeSwitch)
         forceBackgroundSwitch = findViewById(R.id.forceBackgroundSwitch)
         hideSearchSwitch = findViewById(R.id.hideSearchSwitch)
+        realBlurSwitch = findViewById(R.id.realBlurSwitch)
         colorInput = findViewById(R.id.colorInput)
         opacitySlider = findViewById(R.id.opacitySlider)
         radiusSlider = findViewById(R.id.radiusSlider)
@@ -89,6 +103,8 @@ class SettingsActivity : AppCompatActivity() {
         heightSlider = findViewById(R.id.heightSlider)
         iconOffsetXSlider = findViewById(R.id.iconOffsetXSlider)
         iconOffsetYSlider = findViewById(R.id.iconOffsetYSlider)
+        autoHideSlider = findViewById(R.id.autoHideSlider)
+        blurSlider = findViewById(R.id.blurSlider)
         opacityLabel = findViewById(R.id.opacityLabel)
         radiusLabel = findViewById(R.id.radiusLabel)
         topLabel = findViewById(R.id.topLabel)
@@ -99,6 +115,8 @@ class SettingsActivity : AppCompatActivity() {
         heightLabel = findViewById(R.id.heightLabel)
         iconOffsetXLabel = findViewById(R.id.iconOffsetXLabel)
         iconOffsetYLabel = findViewById(R.id.iconOffsetYLabel)
+        autoHideLabel = findViewById(R.id.autoHideLabel)
+        blurLabel = findViewById(R.id.blurLabel)
         restartButton = findViewById(R.id.restartButton)
         dockPreview = findViewById(R.id.dockPreview)
     }
@@ -109,8 +127,9 @@ class SettingsActivity : AppCompatActivity() {
         safeModeSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
         forceBackgroundSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
         hideSearchSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
+        realBlurSwitch.setOnCheckedChangeListener { _, _ -> saveSettings() }
 
-        listOf(opacitySlider, radiusSlider, topSlider, bottomSlider, leftSlider, rightSlider, widthSlider, heightSlider, iconOffsetXSlider, iconOffsetYSlider)
+        listOf(opacitySlider, radiusSlider, topSlider, bottomSlider, leftSlider, rightSlider, widthSlider, heightSlider, iconOffsetXSlider, iconOffsetYSlider, autoHideSlider, blurSlider)
             .forEach { slider ->
                 slider.addOnChangeListener { _, _, _ -> updateLabels() }
                 slider.addOnChangeListener { _, _, _ -> updatePreview() }
@@ -121,6 +140,9 @@ class SettingsActivity : AppCompatActivity() {
             }
 
         findViewById<MaterialButton>(R.id.applyColorButton).setOnClickListener { saveSettings() }
+        findViewById<MaterialButton>(R.id.styleLiquidButton).setOnClickListener { saveStyle(STYLE_LIQUID) }
+        findViewById<MaterialButton>(R.id.styleMatteButton).setOnClickListener { saveStyle(STYLE_MATTE) }
+        findViewById<MaterialButton>(R.id.styleSolidButton).setOnClickListener { saveStyle(STYLE_SOLID) }
         findViewById<MaterialButton>(R.id.presetDarkButton).setOnClickListener {
             applyPreset("#1C1C1E", 82, 34, 0, 16, 14, 14, 92, 0, 0, 0)
         }
@@ -160,6 +182,8 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         findViewById<MaterialButton>(R.id.resetButton).setOnClickListener { resetSettings() }
+        findViewById<MaterialButton>(R.id.exportButton).setOnClickListener { exportConfig() }
+        findViewById<MaterialButton>(R.id.importButton).setOnClickListener { openConfigPicker() }
         restartButton.setOnClickListener { restartLauncher() }
 
         dockPreview.isInteractive = liveEditing
@@ -198,6 +222,7 @@ class SettingsActivity : AppCompatActivity() {
             safeModeSwitch.isChecked = prefs.readBoolean(KEY_SAFE_MODE, true)
             forceBackgroundSwitch.isChecked = prefs.readBoolean(KEY_FORCE_BACKGROUND, true)
             hideSearchSwitch.isChecked = prefs.readBoolean(KEY_HIDE_SEARCH, false)
+            realBlurSwitch.isChecked = prefs.readBoolean(KEY_REAL_BLUR, false)
             colorInput.setText(prefs.getString(KEY_BACKGROUND_COLOR, DEFAULT_COLOR) ?: DEFAULT_COLOR)
             val layoutVersion = prefs.readInt(KEY_LAYOUT_VERSION, 0, 0, Int.MAX_VALUE)
             opacitySlider.value = prefs.readInt(KEY_BACKGROUND_OPACITY, DEFAULT_OPACITY, 0, 100).toFloat()
@@ -210,6 +235,8 @@ class SettingsActivity : AppCompatActivity() {
             heightSlider.value = prefs.readInt(KEY_HEIGHT_DP, DEFAULT_HEIGHT_DP, 0, 200).toFloat()
             iconOffsetXSlider.value = prefs.readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             iconOffsetYSlider.value = prefs.readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
+            autoHideSlider.value = prefs.readInt(KEY_AUTO_HIDE_SECONDS, 0, 0, 60).toFloat()
+            blurSlider.value = prefs.readInt(KEY_BLUR_RADIUS, DEFAULT_BLUR_RADIUS, 0, 50).toFloat()
             if (layoutVersion < 4) {
                 radiusSlider.value = 34f
                 bottomSlider.value = 16f
@@ -223,6 +250,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             updatingUi = false
             val position = prefs.getString(KEY_DOCK_GRAVITY, GRAVITY_BOTTOM) ?: GRAVITY_BOTTOM
+            currentGlassStyle = prefs.getString(KEY_GLASS_STYLE, STYLE_LIQUID) ?: STYLE_LIQUID
             updateLabels(position)
             updatePreview(position)
             statusView.text = getString(R.string.settings_ready)
@@ -246,6 +274,7 @@ class SettingsActivity : AppCompatActivity() {
             editor.putBoolean(KEY_SAFE_MODE, safeModeSwitch.isChecked)
             editor.putBoolean(KEY_FORCE_BACKGROUND, forceBackgroundSwitch.isChecked)
             editor.putBoolean(KEY_HIDE_SEARCH, hideSearchSwitch.isChecked)
+            editor.putBoolean(KEY_REAL_BLUR, realBlurSwitch.isChecked)
             editor.putString(KEY_BACKGROUND_COLOR, colorInput.text.toString().trim())
             editor.putInt(KEY_BACKGROUND_OPACITY, opacitySlider.value.toInt())
             editor.putInt(KEY_CORNER_RADIUS, radiusSlider.value.toInt())
@@ -257,6 +286,8 @@ class SettingsActivity : AppCompatActivity() {
             editor.putInt(KEY_HEIGHT_DP, heightSlider.value.toInt())
             editor.putInt(KEY_ICON_OFFSET_X, iconOffsetXSlider.value.toInt())
             editor.putInt(KEY_ICON_OFFSET_Y, iconOffsetYSlider.value.toInt())
+            editor.putInt(KEY_AUTO_HIDE_SECONDS, autoHideSlider.value.toInt())
+            editor.putInt(KEY_BLUR_RADIUS, blurSlider.value.toInt())
             editor.apply()
             updatePreview()
             statusView.text = getString(R.string.settings_saved)
@@ -275,6 +306,113 @@ class SettingsActivity : AppCompatActivity() {
             updateLabels(position)
             updatePreview(position)
         }
+    }
+
+    private fun saveStyle(style: String) {
+        val service = ServiceHolder.service ?: return
+        runCatching {
+            service.getRemotePreferences(PREFERENCES_GROUP)
+                .edit()
+                .putString(KEY_GLASS_STYLE, style)
+                .apply()
+            currentGlassStyle = style
+        }.onFailure {
+            statusView.text = getString(R.string.settings_save_failed)
+        }
+    }
+
+    private fun openConfigPicker() {
+        runCatching {
+            importConfigLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+        }.onFailure {
+            statusView.text = getString(R.string.config_error)
+        }
+    }
+
+    private fun exportConfig() {
+        runCatching {
+            val values = android.content.ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, CONFIG_FILE_NAME)
+                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Download URI unavailable")
+            contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(configJson().toString().toByteArray(Charsets.UTF_8))
+                stream.flush()
+            } ?: throw IllegalStateException("Output stream unavailable")
+            statusView.text = getString(R.string.config_exported)
+        }.onFailure {
+            statusView.text = getString(R.string.config_error)
+        }
+    }
+
+    private fun importConfig(uri: Uri) {
+        runCatching {
+            val text = contentResolver.openInputStream(uri)?.use { stream ->
+                stream.readBytes().toString(Charsets.UTF_8)
+            } ?: throw IllegalStateException("Input stream unavailable")
+            applyConfigJson(JSONObject(text))
+            statusView.text = getString(R.string.config_imported)
+        }.onFailure {
+            statusView.text = getString(R.string.config_error)
+        }
+    }
+
+    private fun configJson(): JSONObject {
+        return JSONObject()
+            .put(KEY_ENABLED, enabledSwitch.isChecked)
+            .put(KEY_SAFE_MODE, safeModeSwitch.isChecked)
+            .put(KEY_ADAPTIVE, adaptiveSwitch.isChecked)
+            .put(KEY_FORCE_BACKGROUND, forceBackgroundSwitch.isChecked)
+            .put(KEY_HIDE_SEARCH, hideSearchSwitch.isChecked)
+            .put(KEY_REAL_BLUR, realBlurSwitch.isChecked)
+            .put(KEY_BACKGROUND_COLOR, colorInput.text.toString().trim())
+            .put(KEY_BACKGROUND_OPACITY, opacitySlider.value.toInt())
+            .put(KEY_CORNER_RADIUS, radiusSlider.value.toInt())
+            .put(KEY_TOP_MARGIN, topSlider.value.toInt())
+            .put(KEY_BOTTOM_MARGIN, bottomSlider.value.toInt())
+            .put(KEY_LEFT_MARGIN, leftSlider.value.toInt())
+            .put(KEY_RIGHT_MARGIN, rightSlider.value.toInt())
+            .put(KEY_WIDTH_PERCENT, widthSlider.value.toInt())
+            .put(KEY_HEIGHT_DP, heightSlider.value.toInt())
+            .put(KEY_ICON_OFFSET_X, iconOffsetXSlider.value.toInt())
+            .put(KEY_ICON_OFFSET_Y, iconOffsetYSlider.value.toInt())
+            .put(KEY_GLASS_STYLE, currentGlassStyle)
+            .put(KEY_BLUR_RADIUS, blurSlider.value.toInt())
+            .put(KEY_AUTO_HIDE_SECONDS, autoHideSlider.value.toInt())
+            .put(KEY_DOCK_GRAVITY, currentPreviewPosition)
+    }
+
+    private fun applyConfigJson(config: JSONObject) {
+        updatingUi = true
+        enabledSwitch.isChecked = config.optBoolean(KEY_ENABLED, true)
+        safeModeSwitch.isChecked = config.optBoolean(KEY_SAFE_MODE, true)
+        adaptiveSwitch.isChecked = config.optBoolean(KEY_ADAPTIVE, true)
+        forceBackgroundSwitch.isChecked = config.optBoolean(KEY_FORCE_BACKGROUND, true)
+        hideSearchSwitch.isChecked = config.optBoolean(KEY_HIDE_SEARCH, false)
+        realBlurSwitch.isChecked = config.optBoolean(KEY_REAL_BLUR, false)
+        colorInput.setText(config.optString(KEY_BACKGROUND_COLOR, DEFAULT_COLOR))
+        opacitySlider.value = config.optInt(KEY_BACKGROUND_OPACITY, DEFAULT_OPACITY).coerceIn(0, 100).toFloat()
+        radiusSlider.value = config.optInt(KEY_CORNER_RADIUS, DEFAULT_CORNER_RADIUS).coerceIn(0, 50).toFloat()
+        topSlider.value = config.optInt(KEY_TOP_MARGIN, DEFAULT_TOP_MARGIN).coerceIn(0, 100).toFloat()
+        bottomSlider.value = config.optInt(KEY_BOTTOM_MARGIN, DEFAULT_BOTTOM_MARGIN).coerceIn(0, 100).toFloat()
+        leftSlider.value = config.optInt(KEY_LEFT_MARGIN, DEFAULT_HORIZONTAL_MARGIN).coerceIn(0, 100).toFloat()
+        rightSlider.value = config.optInt(KEY_RIGHT_MARGIN, DEFAULT_HORIZONTAL_MARGIN).coerceIn(0, 100).toFloat()
+        widthSlider.value = config.optInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT).coerceIn(40, 100).toFloat()
+        heightSlider.value = config.optInt(KEY_HEIGHT_DP, DEFAULT_HEIGHT_DP).coerceIn(0, 200).toFloat()
+        iconOffsetXSlider.value = config.optInt(KEY_ICON_OFFSET_X, 0).coerceIn(-50, 50).toFloat()
+        iconOffsetYSlider.value = config.optInt(KEY_ICON_OFFSET_Y, 0).coerceIn(-50, 50).toFloat()
+        autoHideSlider.value = config.optInt(KEY_AUTO_HIDE_SECONDS, 0).coerceIn(0, 60).toFloat()
+        blurSlider.value = config.optInt(KEY_BLUR_RADIUS, DEFAULT_BLUR_RADIUS).coerceIn(0, 50).toFloat()
+        currentGlassStyle = config.optString(KEY_GLASS_STYLE, STYLE_LIQUID)
+        val position = config.optString(KEY_DOCK_GRAVITY, GRAVITY_BOTTOM)
+        updatingUi = false
+        updateLabels(position)
+        updatePreview(position)
+        saveSettings()
+        saveStyle(currentGlassStyle)
+        savePosition(position)
     }
 
     private fun applyPreset(
@@ -351,6 +489,8 @@ class SettingsActivity : AppCompatActivity() {
         heightLabel.text = getString(R.string.height_value, heightSlider.value.toInt())
         iconOffsetXLabel.text = getString(R.string.icon_offset_x_value, iconOffsetXSlider.value.toInt())
         iconOffsetYLabel.text = getString(R.string.icon_offset_y_value, iconOffsetYSlider.value.toInt())
+        autoHideLabel.text = getString(R.string.auto_hide, autoHideSlider.value.toInt())
+        blurLabel.text = getString(R.string.blur_radius, blurSlider.value.toInt())
         positionLabel.text = getString(
             R.string.position_value,
             getString(
@@ -419,6 +559,7 @@ class SettingsActivity : AppCompatActivity() {
         const val KEY_SAFE_MODE = "safe_mode"
         const val KEY_FORCE_BACKGROUND = "force_background"
         const val KEY_HIDE_SEARCH = "hide_search"
+        const val KEY_REAL_BLUR = "real_blur"
         const val KEY_BACKGROUND_COLOR = "background_color"
         const val KEY_BACKGROUND_OPACITY = "background_opacity"
         const val KEY_CORNER_RADIUS = "corner_radius"
@@ -430,6 +571,9 @@ class SettingsActivity : AppCompatActivity() {
         const val KEY_HEIGHT_DP = "height_dp"
         const val KEY_ICON_OFFSET_X = "icon_offset_x"
         const val KEY_ICON_OFFSET_Y = "icon_offset_y"
+        const val KEY_GLASS_STYLE = "glass_style"
+        const val KEY_BLUR_RADIUS = "blur_radius"
+        const val KEY_AUTO_HIDE_SECONDS = "auto_hide_seconds"
         const val KEY_DOCK_GRAVITY = "dock_gravity"
         const val KEY_LAYOUT_VERSION = "layout_version"
         const val GRAVITY_BOTTOM = "bottom"
@@ -445,6 +589,11 @@ class SettingsActivity : AppCompatActivity() {
         const val DEFAULT_WIDTH_PERCENT = 100
         const val DEFAULT_HEIGHT_DP = 0
         const val DEFAULT_ICON_OFFSET = 0
+        const val DEFAULT_BLUR_RADIUS = 18
+        const val CONFIG_FILE_NAME = "evolution_dock_config.json"
+        const val STYLE_LIQUID = "liquid"
+        const val STYLE_MATTE = "matte"
+        const val STYLE_SOLID = "solid"
         const val RESTART_LAUNCHER_COMMAND =
             "am force-stop com.google.android.apps.nexuslauncher; " +
                 "am force-stop com.android.launcher3; " +
