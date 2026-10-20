@@ -228,20 +228,22 @@ class SettingsActivity : AppCompatActivity() {
             iconOffsetXSlider.value = prefs.readInt(KEY_ICON_OFFSET_X, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             iconOffsetYSlider.value = prefs.readInt(KEY_ICON_OFFSET_Y, DEFAULT_ICON_OFFSET, -50, 50).toFloat()
             autoHideSlider.value = prefs.readInt(KEY_AUTO_HIDE_SECONDS, 0, 0, 60).toFloat()
-            if (layoutVersion < 6) {
+            if (layoutVersion < 7) {
                 radiusSlider.value = 34f
                 bottomSlider.value = 16f
-                widthSlider.value = 100f
-                leftSlider.value = 0f
-                rightSlider.value = 0f
+                widthSlider.value = 78f
+                leftSlider.value = 14f
+                rightSlider.value = 14f
+                heightSlider.value = 0f
                 prefs.edit()
                     .putInt(KEY_CORNER_RADIUS, 34)
                     .putInt(KEY_BOTTOM_MARGIN, 16)
-                    .putInt(KEY_WIDTH_PERCENT, 100)
-                    .putInt(KEY_LEFT_MARGIN, 0)
-                    .putInt(KEY_RIGHT_MARGIN, 0)
+                    .putInt(KEY_WIDTH_PERCENT, 78)
+                    .putInt(KEY_LEFT_MARGIN, 14)
+                    .putInt(KEY_RIGHT_MARGIN, 14)
+                    .putInt(KEY_HEIGHT_DP, 0)
                     .putBoolean(KEY_REAL_BLUR, false)
-                    .putInt(KEY_LAYOUT_VERSION, 6)
+                    .putInt(KEY_LAYOUT_VERSION, 7)
                     .apply()
             }
             updatingUi = false
@@ -434,7 +436,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun resetSettings() {
-        applyPreset(DEFAULT_COLOR, DEFAULT_OPACITY, DEFAULT_CORNER_RADIUS, DEFAULT_TOP_MARGIN, DEFAULT_BOTTOM_MARGIN, 0, 0, DEFAULT_WIDTH_PERCENT, DEFAULT_HEIGHT_DP, DEFAULT_ICON_OFFSET, DEFAULT_ICON_OFFSET)
+        applyPreset(DEFAULT_COLOR, DEFAULT_OPACITY, DEFAULT_CORNER_RADIUS, DEFAULT_TOP_MARGIN, DEFAULT_BOTTOM_MARGIN, DEFAULT_HORIZONTAL_MARGIN, DEFAULT_HORIZONTAL_MARGIN, DEFAULT_WIDTH_PERCENT, DEFAULT_HEIGHT_DP, DEFAULT_ICON_OFFSET, DEFAULT_ICON_OFFSET)
         savePosition(GRAVITY_BOTTOM)
     }
 
@@ -579,7 +581,7 @@ class SettingsActivity : AppCompatActivity() {
         const val DEFAULT_TOP_MARGIN = 0
         const val DEFAULT_BOTTOM_MARGIN = 14
         const val DEFAULT_HORIZONTAL_MARGIN = 14
-        const val DEFAULT_WIDTH_PERCENT = 100
+        const val DEFAULT_WIDTH_PERCENT = 78
         const val DEFAULT_HEIGHT_DP = 0
         const val DEFAULT_ICON_OFFSET = 0
         const val DEFAULT_BLUR_RADIUS = 18

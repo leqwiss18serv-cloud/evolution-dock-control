@@ -6,4 +6,5 @@
     <item name="dock_hidden" type="id" />
     <item name="dock_background_key" type="id" />
     <item name="dock_icons_container" type="id" />
+    <item name="dock_center_signature" type="id" />
 </resources>

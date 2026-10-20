@@ -25,6 +25,7 @@ class DockControlModule : XposedModule() {
 
     private val hotseatViews = CopyOnWriteArraySet<WeakReference<View>>()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val iconBoundsRect = Rect()
 
     @Volatile
     private var currentStyle = DockStyle.DEFAULT
@@ -86,8 +87,9 @@ class DockControlModule : XposedModule() {
             if (layoutVersion >= LAYOUT_VERSION) return
             preferences.edit()
                 .putInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT)
-                .putInt(KEY_LEFT_MARGIN, 0)
-                .putInt(KEY_RIGHT_MARGIN, 0)
+                .putInt(KEY_LEFT_MARGIN, DEFAULT_HORIZONTAL_MARGIN)
+                .putInt(KEY_RIGHT_MARGIN, DEFAULT_HORIZONTAL_MARGIN)
+                .putInt(KEY_HEIGHT_DP, DEFAULT_HEIGHT_DP)
                 .putBoolean(KEY_REAL_BLUR, false)
                 .putInt(KEY_LAYOUT_VERSION, LAYOUT_VERSION)
                 .apply()
@@ -441,6 +443,9 @@ class DockControlModule : XposedModule() {
         val offsetX = currentStyle.iconOffsetXDp * view.resources.displayMetrics.density
         val offsetY = currentStyle.iconOffsetYDp * view.resources.displayMetrics.density
         val iconsContainer = findIconsContainer(view) ?: return
+        val signature = centerSignature(view, iconsContainer)
+        if (view.getTag(R.id.dock_center_signature) == signature) return
+
         val contentBounds = contentBounds(
             iconsContainer,
             iconsContainer.translationX,
@@ -459,6 +464,7 @@ class DockControlModule : XposedModule() {
         if (abs(deltaY) > 0.25f) {
             iconsContainer.translationY += deltaY
         }
+        view.setTag(R.id.dock_center_signature, signature)
     }
 
     private fun findIconsContainer(view: ViewGroup): ViewGroup? {
@@ -497,32 +503,77 @@ class DockControlModule : XposedModule() {
             if (!isContentChild(child)) continue
             val childOffsetX = offsetX + child.left + child.translationX
             val childOffsetY = offsetY + child.top + child.translationY
+            val visualBounds = visualBounds(child)
             if (child is ViewGroup) {
-                contentBounds(child, childOffsetX, childOffsetY)?.let { childBounds ->
-                    val currentBounds = bounds
-                    if (currentBounds == null) {
-                        bounds = childBounds
-                    } else {
-                        currentBounds.union(
-                            childBounds.left,
-                            childBounds.top,
-                            childBounds.right,
-                            childBounds.bottom
-                        )
-                    }
-                }
+                bounds = unionBounds(
+                    bounds,
+                    childOffsetX + visualBounds.left,
+                    childOffsetY + visualBounds.top,
+                    childOffsetX + visualBounds.left + visualBounds.width(),
+                    childOffsetY + visualBounds.top + visualBounds.height()
+                )
             } else {
-                val childRight = childOffsetX + child.width
-                val childBottom = childOffsetY + child.height
-                if (childRight <= childOffsetX || childBottom <= childOffsetY) continue
-                if (bounds == null) {
-                    bounds = ContentBounds(childOffsetX, childOffsetY, childRight, childBottom)
-                } else {
-                    bounds.union(childOffsetX, childOffsetY, childRight, childBottom)
-                }
+                bounds = unionBounds(
+                    bounds,
+                    childOffsetX + visualBounds.left,
+                    childOffsetY + visualBounds.top,
+                    childOffsetX + visualBounds.left + visualBounds.width(),
+                    childOffsetY + visualBounds.top + visualBounds.height()
+                )
             }
         }
         return bounds
+    }
+
+    private fun visualBounds(child: View): Rect {
+        val method = runCatching {
+            child.javaClass.getMethod("getIconBounds", Rect::class.java)
+        }.getOrNull()
+        if (method != null) {
+            runCatching {
+                iconBoundsRect.setEmpty()
+                method.invoke(child, iconBoundsRect)
+                return Rect(iconBoundsRect)
+            }.onFailure {
+                log(Log.WARN, TAG, "Reading icon bounds failed", it)
+            }
+        }
+        return Rect(0, 0, child.width, child.height)
+    }
+
+    private fun unionBounds(
+        bounds: ContentBounds?,
+        left: Float,
+        top: Float,
+        right: Float,
+        bottom: Float
+    ): ContentBounds? {
+        if (right <= left || bottom <= top) return bounds
+        return if (bounds == null) {
+            ContentBounds(left, top, right, bottom)
+        } else {
+            bounds.union(left, top, right, bottom)
+            bounds
+        }
+    }
+
+    private fun centerSignature(view: View, iconsContainer: ViewGroup): String {
+        val signature = StringBuilder("dock:")
+            .append(view.width).append(':').append(view.height)
+            .append(':').append(currentStyle.iconOffsetXDp)
+            .append(':').append(currentStyle.iconOffsetYDp)
+            .append(':').append(iconsContainer.childCount)
+        for (index in 0 until iconsContainer.childCount) {
+            val child = iconsContainer.getChildAt(index)
+            signature.append(':').append(child.visibility)
+                .append(':').append(child.left)
+                .append(':').append(child.top)
+                .append(':').append(child.width)
+                .append(':').append(child.height)
+                .append(':').append(child.translationX)
+                .append(':').append(child.translationY)
+        }
+        return signature.toString()
     }
 
     private fun isContentChild(child: View): Boolean {
@@ -617,6 +668,7 @@ class DockControlModule : XposedModule() {
         val state = view.getTag(R.id.dock_state) as? OriginalState ?: return
         view.background = state.background
         view.setTag(R.id.dock_background_key, null)
+        view.setTag(R.id.dock_center_signature, null)
         view.setLayerType(state.layerType, null)
         view.setPadding(state.paddingLeft, state.paddingTop, state.paddingRight, state.paddingBottom)
         view.translationY = state.translationY
@@ -843,7 +895,7 @@ class DockControlModule : XposedModule() {
                 bottomMarginDp = 16,
                 leftMarginDp = 14,
                 rightMarginDp = 14,
-                widthPercent = 100,
+                widthPercent = 78,
                 heightDp = 0,
                 iconOffsetXDp = 0,
                 iconOffsetYDp = 0,
@@ -880,7 +932,7 @@ class DockControlModule : XposedModule() {
         const val KEY_AUTO_HIDE_SECONDS = "auto_hide_seconds"
         const val KEY_DOCK_GRAVITY = "dock_gravity"
         const val KEY_LAYOUT_VERSION = "layout_version"
-        const val LAYOUT_VERSION = 6
+        const val LAYOUT_VERSION = 7
         const val GRAVITY_BOTTOM = "bottom"
         const val GRAVITY_TOP = "top"
         const val GRAVITY_LEFT = "left"
@@ -894,7 +946,7 @@ class DockControlModule : XposedModule() {
         const val DEFAULT_TOP_MARGIN = 0
         const val DEFAULT_BOTTOM_MARGIN = 16
         const val DEFAULT_HORIZONTAL_MARGIN = 14
-        const val DEFAULT_WIDTH_PERCENT = 100
+        const val DEFAULT_WIDTH_PERCENT = 78
         const val DEFAULT_HEIGHT_DP = 0
         const val DEFAULT_ICON_OFFSET = 0
         const val DEFAULT_BLUR_RADIUS = 18
