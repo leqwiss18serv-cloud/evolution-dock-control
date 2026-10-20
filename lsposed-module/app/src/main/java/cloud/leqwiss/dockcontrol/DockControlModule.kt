@@ -509,10 +509,11 @@ class DockControlModule : XposedModule() {
             val childOffsetY = offsetY + child.top + child.translationY
             if (child is ViewGroup) {
                 contentBounds(child, childOffsetX, childOffsetY)?.let { childBounds ->
-                    if (bounds == null) {
+                    val currentBounds = bounds
+                    if (currentBounds == null) {
                         bounds = childBounds
                     } else {
-                        bounds.union(childBounds)
+                        currentBounds.union(childBounds)
                     }
                 }
             } else {
