@@ -7,4 +7,6 @@
     <item name="dock_icons_container" type="id" />
     <item name="dock_center_signature" type="id" />
     <item name="dock_paint" type="id" />
+    <item name="dock_content_bounds" type="id" />
+    <item name="dock_content_signature" type="id" />
 </resources>

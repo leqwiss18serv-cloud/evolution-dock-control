@@ -309,11 +309,9 @@ class DockControlModule : XposedModule() {
 
     private fun drawDockBackground(view: View, canvas: Canvas) {
         val iconsContainer = findIconsContainer(view as? ViewGroup ?: return) ?: return
-        val bounds = contentBounds(
-            iconsContainer,
-            iconsContainer.left + iconsContainer.translationX,
-            iconsContainer.top + iconsContainer.translationY
-        ) ?: return
+        val bounds = cachedContentBounds(iconsContainer) ?: return
+        val offsetX = iconsContainer.left + iconsContainer.translationX
+        val offsetY = iconsContainer.top + iconsContainer.translationY
         val density = view.resources.displayMetrics.density
         val style = currentStyle
         val horizontalPadding = style.leftMarginDp * density
@@ -321,16 +319,27 @@ class DockControlModule : XposedModule() {
         val desiredWidth = view.width * style.widthPercent / 100f
         val contentWidth = bounds.width()
         val rectWidth = maxOf(desiredWidth, contentWidth + horizontalPadding * 2f)
-        val centerX = view.width / 2f
-        val left = centerX - rectWidth / 2f
-        val right = centerX + rectWidth / 2f
-        val top = bounds.top - verticalPadding
-        val bottom = bounds.bottom + verticalPadding
+        val contentCenterX = bounds.centerX + offsetX
+        val left = contentCenterX - rectWidth / 2f
+        val right = contentCenterX + rectWidth / 2f
+        val top = bounds.top + offsetY - verticalPadding
+        val bottom = bounds.bottom + offsetY + verticalPadding
         val radius = style.cornerRadiusDp * density
         val paint = dockPaint(view)
         paint.shader = null
         paint.color = style.backgroundColor
         canvas.drawRoundRect(left, top, right, bottom, radius, radius, paint)
+    }
+
+    private fun cachedContentBounds(iconsContainer: ViewGroup): ContentBounds? {
+        val signature = contentSignature(iconsContainer)
+        if (iconsContainer.getTag(R.id.dock_content_signature) == signature) {
+            return iconsContainer.getTag(R.id.dock_content_bounds) as? ContentBounds
+        }
+        val bounds = contentBounds(iconsContainer) ?: return null
+        iconsContainer.setTag(R.id.dock_content_bounds, bounds)
+        iconsContainer.setTag(R.id.dock_content_signature, signature)
+        return bounds
     }
 
     private fun dockPaint(view: View): Paint {
@@ -459,6 +468,31 @@ class DockControlModule : XposedModule() {
             )
         }
         return bounds
+    }
+
+    private fun contentSignature(parent: ViewGroup): Long {
+        var signature = 17L
+        signature = signature * 31L + parent.childCount
+        for (index in 0 until parent.childCount) {
+            val child = parent.getChildAt(index)
+            signature = signature * 31L + System.identityHashCode(child)
+            signature = signature * 31L + child.visibility
+            signature = signature * 31L + child.left
+            signature = signature * 31L + child.top
+            signature = signature * 31L + child.right
+            signature = signature * 31L + child.bottom
+            signature = signature * 31L + child.translationX.toRawBits()
+            signature = signature * 31L + child.translationY.toRawBits()
+            signature = signature * 31L + child.scaleX.toRawBits()
+            signature = signature * 31L + child.scaleY.toRawBits()
+            signature = signature * 31L + child.paddingLeft
+            signature = signature * 31L + child.paddingTop
+            signature = signature * 31L + child.paddingRight
+            signature = signature * 31L + child.paddingBottom
+            signature = signature * 31L + child.measuredWidth
+            signature = signature * 31L + child.measuredHeight
+        }
+        return signature
     }
 
     private fun visualBounds(child: View): Rect {
