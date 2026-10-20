@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -339,7 +340,7 @@ class DockControlModule : XposedModule() {
     }
 
     private fun drawDockBackground(view: View, canvas: Canvas) {
-        val iconsContainer = findIconsContainer(view) ?: return
+        val iconsContainer = findIconsContainer(view as? ViewGroup ?: return) ?: return
         val bounds = contentBounds(iconsContainer) ?: return
         val density = view.resources.displayMetrics.density
         val style = currentStyle
