@@ -89,6 +89,9 @@ class DockControlModule : XposedModule() {
             val layoutVersion = preferences.getInt(KEY_LAYOUT_VERSION, 0)
             if (layoutVersion >= LAYOUT_VERSION) return
             preferences.edit()
+                .putInt(KEY_CORNER_RADIUS, DEFAULT_CORNER_RADIUS)
+                .putInt(KEY_TOP_MARGIN, DEFAULT_TOP_MARGIN)
+                .putInt(KEY_BOTTOM_MARGIN, DEFAULT_BOTTOM_MARGIN)
                 .putInt(KEY_WIDTH_PERCENT, DEFAULT_WIDTH_PERCENT)
                 .putInt(KEY_LEFT_MARGIN, DEFAULT_HORIZONTAL_MARGIN)
                 .putInt(KEY_RIGHT_MARGIN, DEFAULT_HORIZONTAL_MARGIN)
